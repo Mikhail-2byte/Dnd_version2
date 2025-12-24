@@ -64,3 +64,6 @@ backend/uploads/
 # Docker
 .dockerignore
 
+# Example submodules
+Example/
+
