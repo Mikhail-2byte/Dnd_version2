@@ -6,6 +6,8 @@ from typing import Optional
 
 class GameCreate(BaseModel):
     name: str
+    story: Optional[str] = None
+    map_url: Optional[str] = None
 
 
 class GameJoin(BaseModel):
@@ -18,6 +20,7 @@ class GameResponse(BaseModel):
     invite_code: str
     master_id: UUID
     map_url: Optional[str]
+    story: Optional[str]
     created_at: datetime
     
     class Config:

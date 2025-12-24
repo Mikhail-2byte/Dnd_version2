@@ -27,7 +27,9 @@ def create_game(db: Session, game_data: GameCreate, master_id: UUID) -> GameSess
     game = GameSession(
         name=game_data.name,
         invite_code=invite_code,
-        master_id=master_id
+        master_id=master_id,
+        story=game_data.story,
+        map_url=game_data.map_url
     )
     db.add(game)
     db.flush()
