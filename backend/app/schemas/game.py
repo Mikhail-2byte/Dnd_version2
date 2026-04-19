@@ -26,3 +26,31 @@ class GameResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class ParticipantReadyUpdate(BaseModel):
+    is_ready: bool
+
+
+class ParticipantCharacterUpdate(BaseModel):
+    character_id: Optional[UUID] = None
+
+
+class ParticipantResponse(BaseModel):
+    user_id: UUID
+    username: str
+    role: str
+    is_ready: bool
+    character_id: Optional[UUID] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class MasterTransferRequest(BaseModel):
+    to_user_id: UUID
+
+
+class MasterTransferResponse(BaseModel):
+    game: GameResponse
+    new_master_id: UUID
+    old_master_id: UUID

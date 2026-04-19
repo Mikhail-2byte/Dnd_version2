@@ -29,3 +29,9 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
+
+class UserStatsResponse(BaseModel):
+    characters_count: int
+    games_as_master_count: int
+    games_as_player_count: int
+    total_games_count: int

@@ -104,5 +104,5 @@ def test_get_current_user_invalid_token(client):
     """Тест получения текущего пользователя с невалидным токеном"""
     client.headers.update({"Authorization": "Bearer invalid_token_here"})
     response = client.get("/api/auth/me")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 

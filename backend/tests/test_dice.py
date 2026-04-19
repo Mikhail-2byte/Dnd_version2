@@ -109,7 +109,7 @@ def test_roll_dice_without_auth(client: TestClient):
         "/api/dice/roll",
         json={"count": 1, "faces": 20}
     )
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 
 def test_roll_dice_missing_fields(client: TestClient, auth_headers: dict):

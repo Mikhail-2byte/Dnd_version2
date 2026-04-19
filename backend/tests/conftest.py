@@ -14,7 +14,7 @@ from app.database import Base, get_db
 # Импортируем FastAPI app до обертки в socket_app
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import auth, games, maps, dice, characters
+from app.api import auth, games, maps, dice, characters, combat, game_data
 import os
 
 # Устанавливаем тестовые переменные окружения перед импортом настроек
@@ -36,7 +36,9 @@ test_app.include_router(games.router)
 test_app.include_router(maps.router)
 test_app.include_router(dice.router)
 test_app.include_router(characters.router)
-from app.models import User, GameSession, GameParticipant, Token, Character
+test_app.include_router(combat.router)
+test_app.include_router(game_data.router)
+from app.models import User, GameSession, GameParticipant, Token, Character, CombatSession, CombatParticipant, Race, SubRace, Background, ClassFeature, Spell, Weapon, Armor
 from app.utils.security import get_password_hash
 from app.utils.jwt import create_access_token
 from datetime import timedelta

@@ -1,0 +1,101 @@
+{
+  "attack_melee": {
+    "label": "Атака (рукопашная)",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "strength",
+    "roll_type": "attack"
+  },
+  "attack_ranged": {
+    "label": "Атака (дальнобойная)",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "dexterity",
+    "roll_type": "attack"
+  },
+  "strength_save": {
+    "label": "Спасбросок Силы",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "strength",
+    "roll_type": "save"
+  },
+  "dexterity_save": {
+    "label": "Спасбросок Ловкости",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "dexterity",
+    "roll_type": "save"
+  },
+  "constitution_save": {
+    "label": "Спасбросок Телосложения",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "constitution",
+    "roll_type": "save"
+  },
+  "intelligence_save": {
+    "label": "Спасбросок Интеллекта",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "intelligence",
+    "roll_type": "save"
+  },
+  "wisdom_save": {
+    "label": "Спасбросок Мудрости",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "wisdom",
+    "roll_type": "save"
+  },
+  "charisma_save": {
+    "label": "Спасбросок Харизмы",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "charisma",
+    "roll_type": "save"
+  },
+  "strength_check": {
+    "label": "Проверка Силы",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "strength",
+    "roll_type": "skill"
+  },
+  "dexterity_check": {
+    "label": "Проверка Ловкости",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "dexterity",
+    "roll_type": "skill"
+  },
+  "constitution_check": {
+    "label": "Проверка Телосложения",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "constitution",
+    "roll_type": "skill"
+  },
+  "intelligence_check": {
+    "label": "Проверка Интеллекта",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "intelligence",
+    "roll_type": "skill"
+  },
+  "wisdom_check": {
+    "label": "Проверка Мудрости",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "wisdom",
+    "roll_type": "skill"
+  },
+  "charisma_check": {
+    "label": "Проверка Харизмы",
+    "count": 1,
+    "faces": 20,
+    "modifier_source": "charisma",
+    "roll_type": "skill"
+  }
+}
+

@@ -60,11 +60,12 @@ def test_create_game_session(db_session, test_user):
     assert game.created_at is not None
 
 
-def test_create_game_participant(db_session, test_user, test_game):
+def test_create_game_participant(db_session, test_user, test_user2, test_game):
     """Тест создания участника игры"""
+    # Используем test_user2, так как test_user уже является участником (мастером) в test_game
     participant = GameParticipant(
         game_id=test_game.id,
-        user_id=test_user.id,
+        user_id=test_user2.id,
         role="player"
     )
     db_session.add(participant)
@@ -73,7 +74,7 @@ def test_create_game_participant(db_session, test_user, test_game):
     # Проверяем, что участник создан
     found = db_session.query(GameParticipant).filter(
         GameParticipant.game_id == test_game.id,
-        GameParticipant.user_id == test_user.id
+        GameParticipant.user_id == test_user2.id
     ).first()
     
     assert found is not None

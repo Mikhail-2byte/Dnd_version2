@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse
-from ..services.auth_service import register_user, authenticate_user, create_user_token
+from ..schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse, UserStatsResponse
+from ..services.auth_service import register_user, authenticate_user, create_user_token, get_user_stats
 from ..middleware.auth import get_current_user
 from ..models.user import User
 
@@ -41,4 +41,13 @@ async def login(
 async def get_me(current_user: User = Depends(get_current_user)):
     """Получение текущего пользователя"""
     return UserResponse.model_validate(current_user)
+
+
+@router.get("/stats", response_model=UserStatsResponse)
+async def get_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получение статистики текущего пользователя"""
+    return get_user_stats(db, current_user.id)
 

@@ -1,215 +1,552 @@
-# Инструкция по установке и запуску
-
-> **Для пользователей Windows:** См. [SETUP_WINDOWS.md](./SETUP_WINDOWS.md) - подробная пошаговая инструкция с командами PowerShell и решением проблем.
+# Инструкция по установке и запуску проекта D&D Virtual Table
 
 ## Предварительные требования
 
-- Python 3.11+
-- Node.js 18+
-- Docker и Docker Compose
-- Git
+Перед началом убедитесь, что у вас установлены:
 
-## Краткая инструкция (для тех, кто уже настраивал проект)
+1. **Python 3.11+**
+   - Скачать: https://www.python.org/downloads/
+   - При установке обязательно отметьте "Add Python to PATH"
+   - Проверить: `python --version`
 
-Если проект уже настроен, для запуска выполните:
+2. **Node.js 18+**
+   - Скачать: https://nodejs.org/
+   - Проверить: `node --version` и `npm --version`
 
-```bash
-# 1. Запустить базы данных
-docker-compose up -d
+3. **Docker Desktop**
+   - Windows: https://www.docker.com/products/docker-desktop/
+   - Linux/Mac: https://docs.docker.com/get-docker/
+   - После установки запустите Docker Desktop и дождитесь полной загрузки
+   - Проверить: `docker --version` и `docker-compose --version`
 
-# 2. Запустить Backend (в отдельном терминале)
-cd backend
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-# source venv/bin/activate
-python run.py
-
-# 3. Запустить Frontend (в отдельном терминале)
-cd frontend
-npm run dev
-```
-
-Откройте `http://localhost:5173` в браузере.
+4. **Git** (опционально, если клонируете репозиторий)
+   - Скачать: https://git-scm.com/downloads
 
 ---
 
-## Полная инструкция по установке (первый запуск)
+## Шаг 1: Подготовка проекта
 
-## Шаг 1: Запуск баз данных
+### 1.1. Перейдите в папку проекта
 
 ```bash
-# Запустить PostgreSQL и Redis
-docker-compose up -d
+cd C:\Projeck\Dungeons_dragons
+```
 
-# Проверить статус
+### 1.2. Убедитесь, что Docker Desktop запущен
+
+**ВАЖНО:** Docker Desktop должен быть запущен перед выполнением команд!
+
+- Найдите Docker Desktop в меню Пуск и запустите его
+- Дождитесь, пока иконка Docker в системном трее станет зеленой
+- Это может занять 1-2 минуты при первом запуске
+
+Проверьте работу Docker:
+```bash
+docker ps
+```
+Должно вернуться содержимое БЕЗ ошибок.
+
+---
+
+## Шаг 2: Запуск баз данных
+
+### 2.1. Очистка старых контейнеров (если они существуют)
+
+Если вы ранее запускали проект, выполните:
+
+```bash
+docker-compose down
+```
+
+### 2.2. Запуск PostgreSQL и Redis
+
+```bash
+docker-compose up -d
+```
+
+**Ожидаемый результат:**
+```
+[+] Running 2/2
+ ✔ Container dnd_postgres  Started
+ ✔ Container dnd_redis     Started
+```
+
+### 2.3. Проверка статуса контейнеров
+
+```bash
 docker-compose ps
 ```
 
-## Шаг 2: Настройка Backend
+**Ожидаемый результат:**
+```
+NAME            IMAGE                STATUS
+dnd_postgres    postgres:15-alpine   Up (healthy)
+dnd_redis       redis:7-alpine       Up (healthy)
+```
+
+---
+
+## Шаг 3: Настройка Backend
+
+### 3.1. Переход в папку backend
 
 ```bash
 cd backend
+```
 
-# Создать виртуальное окружение
+### 3.2. Создание виртуального окружения Python
+
+**Windows:**
+```powershell
 python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
 
-# Активировать виртуальное окружение
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
+**Linux/Mac:**
+```bash
+python -m venv venv
 source venv/bin/activate
+```
 
-# Установить зависимости
+**Важно:** Если появилась ошибка о политике выполнения скриптов в PowerShell:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+**Признак успешной активации:** В начале строки появится `(venv)`:
+```
+(venv) PS C:\Projeck\Dungeons_dragons\backend>
+```
+
+### 3.3. Установка зависимостей Python
+
+```bash
 pip install -r requirements.txt
+```
 
-# Создать .env файл из шаблона
-copy .env.example .env
-# Linux/Mac: cp .env.example .env
+Это может занять несколько минут. Дождитесь завершения установки.
 
-# Сгенерировать безопасный SECRET_KEY для JWT
-python generate_secret_key.py
-# Скопируйте сгенерированный ключ и вставьте его в .env файл вместо "your-secret-key-here-change-in-production"
-# Или в Windows PowerShell:
-# (Get-Content .env) -replace 'your-secret-key-here-change-in-production', 'ВАШ_СГЕНЕРИРОВАННЫЙ_КЛЮЧ' | Set-Content .env
+**Если появилась ошибка "email-validator is not installed":**
+```bash
+pip install email-validator
+```
 
-# Применить миграции базы данных
-# Миграция уже создана, нужно только применить её
+### 3.4. Создание файла .env
+
+Создайте файл `.env` в папке `backend` со следующим содержимым:
+
+```env
+# Database
+DATABASE_URL=postgresql://dnd_user:dnd_password@localhost:5432/dnd_db
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# JWT
+SECRET_KEY=your-secret-key-here-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Server
+HOST=0.0.0.0
+PORT=8000
+
+# Uploads
+UPLOAD_DIR=uploads
+MAPS_DIR=uploads/maps
+MAX_UPLOAD_SIZE=10485760
+
+# Logging
+LOG_LEVEL=INFO
+```
+
+### 3.5. Генерация SECRET_KEY
+
+**Windows PowerShell:**
+```powershell
+$key = python generate_secret_key.py
+(Get-Content .env) -replace 'your-secret-key-here-change-in-production', $key.Trim() | Set-Content .env
+```
+
+**Linux/Mac:**
+```bash
+KEY=$(python generate_secret_key.py)
+sed -i "s/your-secret-key-here-change-in-production/$KEY/g" .env
+```
+
+**Или вручную:**
+1. Выполните: `python generate_secret_key.py`
+2. Скопируйте сгенерированный ключ
+3. Откройте файл `.env` в текстовом редакторе
+4. Замените `your-secret-key-here-change-in-production` на сгенерированный ключ
+5. Сохраните файл
+
+### 3.6. Применение миграций базы данных
+
+```bash
 alembic upgrade head
 ```
 
-## Шаг 3: Запуск Backend
+**Ожидаемый результат:**
+```
+INFO  [alembic.runtime.migration] Running upgrade  -> e7dfa838beb2, Initial migration
+```
+
+---
+
+## Шаг 4: Запуск Backend
+
+### 4.1. Убедитесь, что виртуальное окружение активировано
+
+Если в начале строки нет `(venv)`, активируйте окружение (см. шаг 3.2).
+
+### 4.2. Убедитесь, что базы данных запущены
+
+В другом окне терминала проверьте:
+```bash
+cd C:\Projeck\Dungeons_dragons
+docker-compose ps
+```
+
+Оба контейнера должны быть в статусе "Up".
+
+### 4.3. Запуск Backend сервера
 
 ```bash
-# Убедитесь, что виртуальное окружение активировано
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
-
-# Из папки backend с активированным venv
 python run.py
-
-# Или через uvicorn напрямую:
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Важно:** Убедитесь, что PostgreSQL и Redis запущены перед запуском backend!
+**Ожидаемый результат:**
+```
+INFO:     Started server process [12345]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
 
-Backend будет доступен на `http://localhost:8000`
+**Важно:** Оставьте это окно открытым! Сервер должен работать постоянно.
 
-API документация: `http://localhost:8000/docs`
+### 4.4. Проверка работы Backend
 
-## Шаг 4: Настройка Frontend
+Откройте браузер и перейдите по адресам:
+
+- `http://localhost:8000/health` - должен вернуть `{"status": "ok"}`
+- `http://localhost:8000/docs` - должна открыться Swagger документация API
+
+---
+
+## Шаг 5: Настройка Frontend
+
+### 5.1. Откройте новое окно терминала
+
+**Важно:** Backend должен продолжать работать в первом окне!
+
+### 5.2. Переход в папку frontend
 
 ```bash
-cd frontend
+cd C:\Projeck\Dungeons_dragons\frontend
+```
 
-# Установить зависимости
+### 5.3. Установка зависимостей Node.js
+
+```bash
 npm install
-
-# Создать .env файл
-copy .env.example .env
-# Linux/Mac: cp .env.example .env
-
-# Отредактировать .env при необходимости (по умолчанию должно работать)
 ```
 
-## Шаг 5: Запуск Frontend
+Это может занять несколько минут при первом запуске. Дождитесь завершения.
+
+### 5.4. Создание файла .env
+
+Создайте файл `.env` в папке `frontend` со следующим содержимым:
+
+```env
+VITE_API_URL=http://localhost:8000
+VITE_WS_URL=http://localhost:8000
+```
+
+---
+
+## Шаг 6: Запуск Frontend
+
+### 6.1. Запуск dev-сервера
 
 ```bash
-# Из папки frontend
 npm run dev
 ```
 
-Frontend будет доступен на `http://localhost:5173`
+**Ожидаемый результат:**
+```
+  VITE v5.x.x  ready in xxx ms
 
-## Использование
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
+```
 
-1. Откройте `http://localhost:5173` в браузере
-2. Зарегистрируйте новый аккаунт
-3. Создайте игру или присоединитесь по invite-коду
-4. Мастер может перетаскивать токены на карте
-5. Все изменения синхронизируются в реальном времени
+**Важно:** Оставьте это окно открытым! Frontend сервер должен работать постоянно.
 
-## Структура базы данных
+### 6.2. Открытие приложения в браузере
 
-После применения миграций будут созданы следующие таблицы:
-- `users` - пользователи
-- `game_sessions` - игровые сессии
-- `game_participants` - участники игр
-- `tokens` - токены на карте
+Откройте браузер и перейдите по адресу:
+
+**http://localhost:5173**
+
+Должна загрузиться страница регистрации/входа.
+
+---
+
+## Быстрый запуск (после первоначальной настройки)
+
+Если проект уже настроен, для запуска выполните в **трех отдельных окнах терминала**:
+
+### Окно 1: Базы данных
+```bash
+cd C:\Projeck\Dungeons_dragons
+docker-compose up -d
+```
+
+### Окно 2: Backend
+```bash
+cd C:\Projeck\Dungeons_dragons\backend
+# Windows:
+.\venv\Scripts\Activate.ps1
+# Linux/Mac:
+# source venv/bin/activate
+python run.py
+```
+
+### Окно 3: Frontend
+```bash
+cd C:\Projeck\Dungeons_dragons\frontend
+npm run dev
+```
+
+Затем откройте `http://localhost:5173` в браузере.
+
+---
+
+## Использование приложения
+
+1. **Регистрация:**
+   - Введите email, username и password
+   - Нажмите "Зарегистрироваться"
+
+2. **Создание игры:**
+   - После входа нажмите "Создать игру"
+   - Введите название игры
+   - Скопируйте invite-код
+
+3. **Присоединение к игре:**
+   - В другом окне браузера (или инкогнито) зарегистрируйте второго пользователя
+   - Введите invite-код и нажмите "Присоединиться"
+
+4. **Игра:**
+   - Мастер может перетаскивать токены на карте
+   - Все изменения синхронизируются в реальном времени между всеми игроками
+
+---
+
+## Создание тестовых данных
+
+Для быстрого тестирования можно создать тестовую игру:
+
+```bash
+cd backend
+# Windows:
+.\venv\Scripts\python.exe create_test_game.py
+# Linux/Mac:
+# source venv/bin/activate
+# python create_test_game.py
+```
+
+Скрипт создаст:
+- **Мастера**: `test_master@example.com` / `test123`
+- **Игру** с invite-кодом `TEST01`
+
+---
 
 ## Решение проблем
 
-### Ошибка подключения к БД
+### Проблема: "Conflict. The container name is already in use"
 
-Проверьте, что PostgreSQL запущен:
+**Решение:**
 ```bash
-docker-compose ps
-```
-
-Проверьте переменные в `.env` файле backend.
-
-### Ошибка подключения к Redis
-
-Проверьте, что Redis запущен:
-```bash
-docker-compose ps
-```
-
-### Порт уже занят
-
-Измените порты в:
-- Backend: `backend/app/config.py` или `.env`
-- Frontend: `frontend/vite.config.ts`
-
-### Миграции не применяются
-
-Убедитесь, что:
-1. PostgreSQL запущен через `docker-compose up -d`
-2. База данных создана (создается автоматически при первом запуске контейнера)
-3. Переменная `DATABASE_URL` в `.env` правильная и соответствует настройкам docker-compose.yml
-4. Пользователь БД имеет права на создание таблиц
-
-### Ошибка "ModuleNotFoundError" при запуске
-
-Убедитесь, что:
-1. Виртуальное окружение активировано
-2. Все зависимости установлены: `pip install -r requirements.txt`
-
-### Ошибка "SECRET_KEY" не найден
-
-Убедитесь, что:
-1. Файл `.env` создан из `.env.example`
-2. В `.env` файле установлен правильный `SECRET_KEY` (сгенерируйте через `python generate_secret_key.py`)
-
-## Остановка
-
-```bash
-# Остановить контейнеры (PostgreSQL и Redis)
 docker-compose down
+docker-compose up -d
+```
 
-# Остановить с удалением данных (ОСТОРОЖНО! Удалит все данные из БД)
+Если не помогло:
+```bash
+docker rm -f dnd_postgres dnd_redis
+docker-compose up -d
+```
+
+### Проблема: "Docker Desktop не запущен"
+
+**Симптомы:**
+```
+error during connect: Get "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/...": 
+open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
+```
+
+**Решение:**
+1. Запустите Docker Desktop из меню Пуск
+2. Дождитесь полной загрузки (иконка в трее должна стать зеленой)
+3. Попробуйте снова: `docker-compose up -d`
+
+### Проблема: "Политика выполнения скриптов" (Windows PowerShell)
+
+**Симптомы:**
+```
+.\venv\Scripts\Activate.ps1 : Невозможно загрузить файл, так как выполнение скриптов 
+отключено в данной системе.
+```
+
+**Решение:**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Затем снова активируйте окружение.
+
+### Проблема: "Порт уже занят"
+
+**Симптомы:**
+```
+ERROR:    [Errno 10048] error while attempting to bind on address ('0.0.0.0', 8000): 
+only one usage of each socket address (protocol/network address/port) is normally permitted
+```
+
+**Решение:**
+1. Найдите процесс, занимающий порт:
+   ```powershell
+   # Windows:
+   netstat -ano | findstr :8000
+   # Linux/Mac:
+   # lsof -i :8000
+   ```
+2. Завершите процесс или измените порт в `backend/app/config.py` или `.env`
+
+### Проблема: "ModuleNotFoundError"
+
+**Симптомы:**
+```
+ModuleNotFoundError: No module named 'fastapi'
+```
+
+**Решение:**
+1. Убедитесь, что виртуальное окружение активировано (видно `(venv)` в начале строки)
+2. Переустановите зависимости:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Проблема: "Ошибка подключения к БД"
+
+**Симптомы:**
+```
+psycopg2.OperationalError: connection to server at "localhost" (127.0.0.1), port 5432 failed
+```
+
+**Решение:**
+1. Проверьте, что Docker Desktop запущен
+2. Проверьте статус контейнеров:
+   ```bash
+   docker-compose ps
+   ```
+3. Если контейнеры не запущены:
+   ```bash
+   docker-compose up -d
+   ```
+4. Проверьте `DATABASE_URL` в `backend/.env` файле
+
+### Проблема: "npm install" не работает
+
+**Решение:**
+1. Убедитесь, что Node.js установлен: `node --version`
+2. Очистите кеш npm:
+   ```bash
+   npm cache clean --force
+   ```
+3. Удалите папку `node_modules` и файл `package-lock.json`, затем:
+   ```bash
+   npm install
+   ```
+
+---
+
+## Остановка приложения
+
+### Остановка Frontend и Backend
+
+В окнах терминала, где запущены серверы, нажмите `Ctrl + C`
+
+### Остановка баз данных
+
+```bash
+cd C:\Projeck\Dungeons_dragons
+docker-compose down
+```
+
+**ОСТОРОЖНО:** Для полного удаления данных (включая базу данных):
+
+```bash
 docker-compose down -v
 ```
 
-**Примечание:** Остановка контейнеров не останавливает backend и frontend серверы. Остановите их вручную (Ctrl+C в терминалах).
+---
 
 ## Проверка работоспособности
 
 После запуска всех компонентов проверьте:
 
-1. **Backend работает:**
+1. **Docker контейнеры:**
+   ```bash
+   docker-compose ps
+   ```
+   Оба контейнера должны быть в статусе "Up (healthy)"
+
+2. **Backend:**
    - Откройте `http://localhost:8000/health` - должен вернуть `{"status": "ok"}`
    - Откройте `http://localhost:8000/docs` - должна открыться Swagger документация
 
-2. **Frontend работает:**
+3. **Frontend:**
    - Откройте `http://localhost:5173` - должна загрузиться страница регистрации/входа
 
-3. **Базы данных работают:**
-   ```bash
-   docker-compose ps
-   # Оба контейнера должны быть в статусе "Up"
-   ```
+---
 
+## Полезные команды
+
+### Просмотр логов Docker контейнеров
+
+```bash
+docker-compose logs -f
+```
+
+### Перезапуск контейнеров
+
+```bash
+docker-compose restart
+```
+
+### Просмотр использования ресурсов
+
+```bash
+docker stats
+```
+
+### Очистка неиспользуемых образов Docker
+
+```bash
+docker system prune -a
+```
+
+---
+
+## Дополнительная информация
+
+- **Backend API:** http://localhost:8000/docs
+- **Frontend:** http://localhost:5173
+- **Health Check:** http://localhost:8000/health
+
+При возникновении проблем проверьте логи в окнах терминала, где запущены серверы.

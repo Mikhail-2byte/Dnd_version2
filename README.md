@@ -23,65 +23,14 @@
 
 ## Быстрый старт
 
-### Предварительные требования
+Для подробной инструкции по установке и настройке см. [SETUP.md](./SETUP.md)
 
-- Python 3.11+
-- Node.js 18+
-- Docker и Docker Compose
+**Краткая версия:**
 
-### Установка и запуск
-
-1. **Клонируйте репозиторий и перейдите в папку проекта:**
-```bash
-cd C:\Projeck\Dungeons_dragons
-```
-
-2. **Запустите PostgreSQL и Redis:**
-```bash
-docker-compose up -d
-```
-
-3. **Настройте Backend:**
-```bash
-cd backend
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
-
-pip install -r requirements.txt
-cp .env.example .env
-# Отредактируйте .env при необходимости
-```
-
-4. **Примените миграции БД:**
-```bash
-alembic upgrade head
-```
-
-5. **Запустите Backend:**
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-6. **Настройте Frontend:**
-```bash
-cd ../frontend
-npm install
-cp .env.example .env
-# Отредактируйте .env при необходимости
-```
-
-7. **Запустите Frontend:**
-```bash
-npm run dev
-```
-
-8. **Откройте браузер:**
-```
-http://localhost:5173
-```
+1. Запустите базы данных: `docker-compose up -d`
+2. Настройте и запустите Backend (см. [SETUP.md](./SETUP.md))
+3. Настройте и запустите Frontend (см. [SETUP.md](./SETUP.md))
+4. Откройте `http://localhost:5173` в браузере
 
 ## Структура проекта
 
@@ -172,9 +121,7 @@ VITE_WS_URL=ws://localhost:8000
 
 ## Документация
 
-- [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) - **детальный план реализации (что сделано, что нужно сделать, тесты)**
-- [SETUP.md](./SETUP.md) - инструкция по установке и запуску
-- [MICROSERVICES_REFERENCE.md](./MICROSERVICES_REFERENCE.md) - описание микросервисов из Example/
+- [SETUP.md](./SETUP.md) - подробная инструкция по установке, настройке и запуску проекта
 
 ## Лицензия
 

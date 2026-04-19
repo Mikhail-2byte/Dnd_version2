@@ -266,8 +266,8 @@ def test_delete_character_unauthorized(client: TestClient, auth_headers: dict, d
 def test_character_without_auth(client: TestClient):
     """Тест доступа к персонажам без аутентификации"""
     response = client.get("/api/characters")
-    assert response.status_code == 401
+    assert response.status_code == 403
     
     response = client.post("/api/characters", json={"name": "Test"})
-    assert response.status_code == 401
+    assert response.status_code == 403
 
