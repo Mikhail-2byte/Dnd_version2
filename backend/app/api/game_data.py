@@ -6,14 +6,14 @@ from ..database import get_db
 from ..schemas.game_data import (
     RaceResponse, BackgroundResponse, ClassFeatureResponse,
     SpellResponse, WeaponResponse, ArmorResponse,
-    MonsterResponse, MonsterListResponse,
+    ItemResponse, MonsterResponse, MonsterListResponse,
 )
 from ..services.game_data_service import (
     get_all_races, get_race_by_slug,
     get_all_backgrounds, get_background_by_slug,
     get_class_features,
     get_spells, get_spell_by_slug,
-    get_weapons, get_armors,
+    get_weapons, get_armors, get_items,
     get_monsters, get_monster_by_slug,
 )
 
@@ -78,6 +78,14 @@ async def list_armors(
     db: Session = Depends(get_db),
 ):
     return get_armors(db, category)
+
+
+@router.get("/items", response_model=List[ItemResponse])
+async def list_items(
+    category: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    return get_items(db, category)
 
 
 @router.get("/monsters", response_model=List[MonsterListResponse])

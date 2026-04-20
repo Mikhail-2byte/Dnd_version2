@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import Dict, Any, List
+import os
+import shutil
 from ..database import get_db
 from ..models.user import User
 from ..middleware.auth import get_current_user
+from ..config import settings
 from ..schemas.character import (
     CharacterCreate,
     CharacterUpdate,
@@ -53,6 +56,32 @@ def _to_response(character) -> CharacterResponse:
     return resp
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
+@router.post("/upload-avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Загрузка портрета персонажа"""
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Разрешены только изображения: JPEG, PNG, WebP, GIF",
+        )
+
+    ext = os.path.splitext(file.filename or "avatar.png")[1] or ".png"
+    filename = f"{uuid4()}{ext}"
+    avatars_dir = os.path.join(settings.upload_dir, "avatars")
+    os.makedirs(avatars_dir, exist_ok=True)
+    dest = os.path.join(avatars_dir, filename)
+
+    with open(dest, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    return {"avatar_url": f"/uploads/avatars/{filename}"}
 
 
 @router.get("/templates", response_model=Dict[str, Any])

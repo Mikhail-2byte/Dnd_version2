@@ -17,6 +17,9 @@ export interface Character {
   skill_proficiencies?: string[] | null;
   saving_throw_proficiencies?: string[] | null;
   experience_points?: number | null;
+  gold?: number | null;
+  silver?: number | null;
+  copper?: number | null;
   proficiency_bonus?: number | null;
   character_history?: string | null;
   equipment_and_features?: string | null;
@@ -60,6 +63,9 @@ export interface CharacterUpdate {
   skill_proficiencies?: string[];
   saving_throw_proficiencies?: string[];
   experience_points?: number;
+  gold?: number;
+  silver?: number;
+  copper?: number;
   character_history?: string;
   equipment_and_features?: string;
   avatar_url?: string;
@@ -287,4 +293,15 @@ export interface MonsterListItem {
   xp_reward?: number;
   hp_average?: number;
   armor_class: number;
+}
+
+export interface ItemData {
+  id: string;
+  slug: string;
+  name: string;
+  name_en?: string;
+  category?: string;
+  description?: string;
+  weight?: number;
+  cost_gp?: number;
 }

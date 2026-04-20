@@ -185,6 +185,19 @@ class MonsterListResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ItemResponse(BaseModel):
+    id: UUID
+    slug: str
+    name: str
+    name_en: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    weight: Optional[float] = None
+    cost_gp: Optional[float] = None
+
+    model_config = {"from_attributes": True}
+
+
 class SpawnMonsterRequest(BaseModel):
     monster_slug: str
     x: float = 50.0

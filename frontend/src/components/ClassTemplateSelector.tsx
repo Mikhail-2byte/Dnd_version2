@@ -1,6 +1,6 @@
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { Sword, Wand2, Dagger, Shield, Bow } from 'lucide-react';
+import { Sword, Wand2, Swords, Shield, Crosshair } from 'lucide-react';
 import type { CharacterTemplate } from '../types/character';
 
 interface ClassTemplateSelectorProps {
@@ -12,9 +12,9 @@ interface ClassTemplateSelectorProps {
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   sword: Sword,
   wand: Wand2,
-  dagger: Dagger,
+  dagger: Swords,
   shield: Shield,
-  bow: Bow,
+  bow: Crosshair,
 };
 
 export default function ClassTemplateSelector({

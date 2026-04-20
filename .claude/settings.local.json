@@ -27,7 +27,9 @@
       "mcp__playwright__browser_console_messages",
       "mcp__playwright__browser_evaluate",
       "mcp__playwright__browser_snapshot",
-      "Bash(venv/Scripts/activate)"
+      "Bash(venv/Scripts/activate)",
+      "Bash(alembic upgrade *)",
+      "Bash(rtk npx *)"
     ]
   },
   "defaultMode": "bypassPermissions"

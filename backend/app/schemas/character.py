@@ -43,6 +43,9 @@ class CharacterUpdate(BaseModel):
     skill_proficiencies: Optional[List[str]] = None
     saving_throw_proficiencies: Optional[List[str]] = None
     experience_points: Optional[int] = Field(None, ge=0)
+    gold: Optional[int] = Field(None, ge=0)
+    silver: Optional[int] = Field(None, ge=0)
+    copper: Optional[int] = Field(None, ge=0)
     character_history: Optional[str] = None
     equipment_and_features: Optional[str] = None
     avatar_url: Optional[str] = Field(None, max_length=500)
@@ -105,6 +108,9 @@ class CharacterResponse(BaseModel):
     skill_proficiencies: Optional[List[str]] = None
     saving_throw_proficiencies: Optional[List[str]] = None
     experience_points: Optional[int] = 0
+    gold: Optional[int] = 0
+    silver: Optional[int] = 0
+    copper: Optional[int] = 0
     proficiency_bonus: Optional[int] = None
     character_history: Optional[str] = None
     equipment_and_features: Optional[str] = None

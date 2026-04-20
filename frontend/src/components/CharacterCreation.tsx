@@ -8,7 +8,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Header } from './Header';
-import { ArrowLeft, Save, Scroll, Shield, Heart, Zap } from 'lucide-react';
+import { ArrowLeft, Save, Scroll, Shield, Heart, Zap, Upload, Loader2 } from 'lucide-react';
 import { charactersAPI, gameDataAPI } from '../services/api';
 import ClassTemplateSelector from './ClassTemplateSelector';
 import type { CharacterCreate, CharacterTemplate, RaceData, BackgroundData } from '../types/character';
@@ -83,6 +83,10 @@ export default function CharacterCreation({ onSubmit, onCancel }: Props) {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [generationMethod, setGenerationMethod] = useState('standard_array');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Race / background from DB
   const [races, setRaces] = useState<RaceData[]>([]);
@@ -184,11 +188,28 @@ export default function CharacterCreation({ onSubmit, onCancel }: Props) {
     }
   };
 
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarPreview(URL.createObjectURL(file));
+    setIsUploadingAvatar(true);
+    try {
+      const url = await charactersAPI.uploadAvatar(file);
+      setAvatarUrl(url);
+    } catch (err) {
+      console.error('Avatar upload failed', err);
+      setAvatarPreview('');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   const handleFormSubmit = async (values: FormValues) => {
     const payload: CharacterCreate = {
       ...values,
       race_slug: selectedRaceSlug || undefined,
       background_slug: selectedBgSlug || undefined,
+      avatar_url: avatarUrl || undefined,
     };
     await onSubmit(payload);
   };
@@ -422,10 +443,39 @@ export default function CharacterCreation({ onSubmit, onCancel }: Props) {
                     <div className="absolute bottom-0 right-0 w-12 h-12 border-b-2 border-r-2 border-accent" />
 
                     <div className="text-center space-y-4">
-                      <div className="w-32 h-32 mx-auto bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center border-4 border-accent shadow-xl">
-                        <span className="text-6xl text-primary-foreground font-bold font-serif">
-                          {w.name?.[0]?.toUpperCase() || '?'}
-                        </span>
+                      {/* Avatar upload */}
+                      <div className="relative w-32 h-32 mx-auto">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarFileChange}
+                        />
+                        <div
+                          className="w-32 h-32 rounded-full border-4 border-accent shadow-xl overflow-hidden cursor-pointer bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          {avatarPreview ? (
+                            <img src={avatarPreview} alt="Аватар" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-6xl text-primary-foreground font-bold font-serif">
+                              {w.name?.[0]?.toUpperCase() || '?'}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center shadow-md hover:bg-accent/90 transition-colors"
+                          title="Загрузить портрет"
+                        >
+                          {isUploadingAvatar ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Upload className="w-4 h-4" />
+                          )}
+                        </button>
                       </div>
 
                       <div className="border-t-2 border-b-2 border-primary py-3">

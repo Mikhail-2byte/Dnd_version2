@@ -6,9 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { inventoryAPI, gameDataAPI } from '../services/api';
-import type { InventoryItem, WeaponData, ArmorData } from '../types/character';
-import { Sword, Shield, Package, Plus, Trash2, Star } from 'lucide-react';
+import { inventoryAPI, gameDataAPI, charactersAPI } from '../services/api';
+import type { InventoryItem, WeaponData, ArmorData, ItemData, Character } from '../types/character';
+import { Sword, Shield, Package, Plus, Trash2, Star, Coins } from 'lucide-react';
 
 interface InventoryPanelProps {
   characterId: string;
@@ -16,15 +16,22 @@ interface InventoryPanelProps {
 
 export default function InventoryPanel({ characterId }: InventoryPanelProps) {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [character, setCharacter] = useState<Character | null>(null);
   const [loading, setLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [addTab, setAddTab] = useState<'weapon' | 'armor'>('weapon');
+  const [addTab, setAddTab] = useState<'weapon' | 'armor' | 'item'>('weapon');
   const [weapons, setWeapons] = useState<WeaponData[]>([]);
   const [armors, setArmors] = useState<ArmorData[]>([]);
+  const [genericItems, setGenericItems] = useState<ItemData[]>([]);
   const [search, setSearch] = useState('');
+  const [currencyEdit, setCurrencyEdit] = useState(false);
+  const [gold, setGold] = useState(0);
+  const [silver, setSilver] = useState(0);
+  const [copper, setCopper] = useState(0);
 
   useEffect(() => {
     loadInventory();
+    loadCharacter();
   }, [characterId]);
 
   async function loadInventory() {
@@ -39,14 +46,41 @@ export default function InventoryPanel({ characterId }: InventoryPanelProps) {
     }
   }
 
-  async function openAddDialog() {
-    setAddOpen(true);
-    const [ws, as] = await Promise.all([gameDataAPI.getWeapons(), gameDataAPI.getArmors()]);
-    setWeapons(ws);
-    setArmors(as);
+  async function loadCharacter() {
+    try {
+      const char = await charactersAPI.getById(characterId);
+      setCharacter(char);
+      setGold(char.gold ?? 0);
+      setSilver(char.silver ?? 0);
+      setCopper(char.copper ?? 0);
+    } catch (e) {
+      console.error('Failed to load character', e);
+    }
   }
 
-  async function handleAdd(itemType: 'weapon' | 'armor', itemId: string) {
+  async function saveCurrency() {
+    try {
+      await charactersAPI.update(characterId, { gold, silver, copper });
+      setCharacter(prev => prev ? { ...prev, gold, silver, copper } : prev);
+      setCurrencyEdit(false);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function openAddDialog() {
+    setAddOpen(true);
+    const [ws, as, gi] = await Promise.all([
+      gameDataAPI.getWeapons(),
+      gameDataAPI.getArmors(),
+      gameDataAPI.getItems(),
+    ]);
+    setWeapons(ws);
+    setArmors(as);
+    setGenericItems(gi);
+  }
+
+  async function handleAdd(itemType: 'weapon' | 'armor' | 'item', itemId: string) {
     try {
       await inventoryAPI.addItem(characterId, itemType, itemId);
       await loadInventory();
@@ -86,6 +120,7 @@ export default function InventoryPanel({ characterId }: InventoryPanelProps) {
 
   const filteredWeapons = weapons.filter(w => w.name.toLowerCase().includes(search.toLowerCase()));
   const filteredArmors = armors.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredItems = genericItems.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
 
   function renderItem(item: InventoryItem) {
     const name = item.item_data?.name ?? '???';
@@ -106,15 +141,17 @@ export default function InventoryPanel({ characterId }: InventoryPanelProps) {
           {item.quantity > 1 && <Badge variant="outline" className="text-xs">×{item.quantity}</Badge>}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <Button
-            variant={item.is_equipped ? 'default' : 'outline'}
-            size="icon"
-            className="h-7 w-7"
-            title={item.is_equipped ? 'Снять' : 'Надеть'}
-            onClick={() => handleEquip(item)}
-          >
-            <Star className="h-3 w-3" />
-          </Button>
+          {item.item_type !== 'item' && (
+            <Button
+              variant={item.is_equipped ? 'default' : 'outline'}
+              size="icon"
+              className="h-7 w-7"
+              title={item.is_equipped ? 'Снять' : 'Надеть'}
+              onClick={() => handleEquip(item)}
+            >
+              <Star className="h-3 w-3" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -141,8 +178,39 @@ export default function InventoryPanel({ characterId }: InventoryPanelProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 overflow-hidden p-3">
-        <ScrollArea className="h-full">
+      <CardContent className="flex-1 overflow-hidden p-3 space-y-3">
+        {/* Валюта */}
+        <div className="flex items-center gap-2 p-2 rounded border border-border">
+          <Coins className="h-4 w-4 text-yellow-500 shrink-0" />
+          {currencyEdit ? (
+            <div className="flex items-center gap-1 flex-1 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-yellow-500 font-medium">ЗМ</span>
+                <Input type="number" value={gold} onChange={e => setGold(Math.max(0, +e.target.value))} className="h-6 w-14 text-xs px-1" min={0} />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-400 font-medium">СМ</span>
+                <Input type="number" value={silver} onChange={e => setSilver(Math.max(0, +e.target.value))} className="h-6 w-14 text-xs px-1" min={0} />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-amber-700 font-medium">МЕ</span>
+                <Input type="number" value={copper} onChange={e => setCopper(Math.max(0, +e.target.value))} className="h-6 w-14 text-xs px-1" min={0} />
+              </div>
+              <Button size="sm" className="h-6 text-xs px-2" onClick={saveCurrency}>Сохранить</Button>
+              <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => { setGold(character?.gold ?? 0); setSilver(character?.silver ?? 0); setCopper(character?.copper ?? 0); setCurrencyEdit(false); }}>Отмена</Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => setCurrencyEdit(true)}>
+              <span className="text-sm"><span className="text-yellow-500 font-semibold">{character?.gold ?? 0}</span> <span className="text-xs text-muted-foreground">ЗМ</span></span>
+              <span className="text-sm"><span className="text-gray-400 font-semibold">{character?.silver ?? 0}</span> <span className="text-xs text-muted-foreground">СМ</span></span>
+              <span className="text-sm"><span className="text-amber-700 font-semibold">{character?.copper ?? 0}</span> <span className="text-xs text-muted-foreground">МЕ</span></span>
+              <span className="text-xs text-muted-foreground ml-auto">✏</span>
+            </div>
+          )}
+        </div>
+
+        {/* Предметы */}
+        <ScrollArea className="flex-1 h-56">
           {loading ? (
             <p className="text-muted-foreground text-sm text-center py-4">Загрузка...</p>
           ) : items.length === 0 ? (
@@ -187,6 +255,7 @@ export default function InventoryPanel({ characterId }: InventoryPanelProps) {
             <TabsList className="w-full">
               <TabsTrigger value="weapon" className="flex-1">Оружие</TabsTrigger>
               <TabsTrigger value="armor" className="flex-1">Доспехи</TabsTrigger>
+              <TabsTrigger value="item" className="flex-1">Прочее</TabsTrigger>
             </TabsList>
             <TabsContent value="weapon">
               <ScrollArea className="h-64">
@@ -218,6 +287,23 @@ export default function InventoryPanel({ characterId }: InventoryPanelProps) {
                       <p className="text-xs text-muted-foreground">КБ {a.base_ac} · {a.category}</p>
                     </div>
                     <Plus className="h-4 w-4 text-primary" />
+                  </div>
+                ))}
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="item">
+              <ScrollArea className="h-64">
+                {filteredItems.map(i => (
+                  <div
+                    key={i.id}
+                    className="flex items-center justify-between p-2 hover:bg-muted/30 rounded cursor-pointer"
+                    onClick={() => handleAdd('item', i.id)}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm">{i.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{i.category}{i.cost_gp ? ` · ${i.cost_gp} ЗМ` : ''}</p>
+                    </div>
+                    <Plus className="h-4 w-4 text-primary shrink-0" />
                   </div>
                 ))}
               </ScrollArea>

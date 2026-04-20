@@ -12,6 +12,8 @@ import CreateGameSelection from './pages/CreateGameSelection';
 import CreateGameNew from './pages/CreateGameNew';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import MyCharacters from './pages/MyCharacters';
+import CreateCharacter from './pages/CreateCharacter';
 
 // Компонент для обработки глобальных событий авторизации
 function AuthEventHandler() {
@@ -121,6 +123,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/characters"
+            element={
+              <ProtectedRoute>
+                <MyCharacters />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/characters/create"
+            element={
+              <ProtectedRoute>
+                <CreateCharacter />
               </ProtectedRoute>
             }
           />

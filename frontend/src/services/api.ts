@@ -3,14 +3,14 @@ import type { TokenResponse, User, UserStats } from '../types/user';
 import type { GameSession, Token } from '../types/game';
 import type {
   Character, CharacterCreate, CharacterUpdate, RaceData, BackgroundData,
-  InventoryItem, WeaponData, ArmorData,
+  InventoryItem, WeaponData, ArmorData, ItemData,
   SpellbookData, SpellData,
   MonsterData, MonsterListItem,
 } from '../types/character';
 import type { DiceRollHistoryItem, DiceRollHistoryFilters } from '../types/dice';
 import type { CombatSession, StartCombatRequest, RollInitiativeRequest, CombatParticipant } from '../types/combat';
 
-const API_URL = import.meta.env.VITE_API_URL ?? '';
+export const API_URL: string = (import.meta.env.VITE_API_URL as string) ?? '';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -222,6 +222,15 @@ export const charactersAPI = {
     });
     return response.data;
   },
+
+  uploadAvatar: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<{ avatar_url: string }>('/api/characters/upload-avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.avatar_url;
+  },
 };
 
 export const diceAPI = {
@@ -360,6 +369,12 @@ export const gameDataAPI = {
   getArmors: async (category?: string): Promise<ArmorData[]> => {
     const params = category ? { category } : {};
     const response = await api.get<ArmorData[]>('/api/data/armors', { params });
+    return response.data;
+  },
+
+  getItems: async (category?: string): Promise<ItemData[]> => {
+    const params = category ? { category } : {};
+    const response = await api.get<ItemData[]>('/api/data/items', { params });
     return response.data;
   },
 

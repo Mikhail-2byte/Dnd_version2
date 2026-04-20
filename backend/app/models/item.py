@@ -5,6 +5,19 @@ from ..database import Base
 from .types import GUID
 
 
+class Item(Base):
+    __tablename__ = "items"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    slug = Column(String(100), unique=True, index=True, nullable=False)
+    name = Column(String(100), nullable=False)
+    name_en = Column(String(100))
+    category = Column(String(50), index=True)  # potion, gear, tool, container, etc.
+    description = Column(Text)
+    weight = Column(Float, default=0)
+    cost_gp = Column(Float, default=0)
+
+
 class Weapon(Base):
     __tablename__ = "weapons"
 

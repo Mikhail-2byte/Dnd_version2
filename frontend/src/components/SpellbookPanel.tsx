@@ -8,11 +8,12 @@ import { ScrollArea } from './ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { spellbookAPI, gameDataAPI } from '../services/api';
 import type { SpellbookEntry, SpellSlotInfo, SpellData } from '../types/character';
-import { BookOpen, Plus, Trash2, Eye, EyeOff, Circle } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Eye, EyeOff, Circle, Zap } from 'lucide-react';
 
 interface SpellbookPanelProps {
   characterId: string;
   characterClass: string;
+  combatId?: string | null;
 }
 
 const SCHOOL_NAMES: Record<string, string> = {
@@ -21,7 +22,7 @@ const SCHOOL_NAMES: Record<string, string> = {
   transmutation: 'Преобразование', divination: 'Прорицание',
 };
 
-export default function SpellbookPanel({ characterId, characterClass }: SpellbookPanelProps) {
+export default function SpellbookPanel({ characterId, characterClass, combatId }: SpellbookPanelProps) {
   const [spells, setSpells] = useState<SpellbookEntry[]>([]);
   const [slots, setSlots] = useState<SpellSlotInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,6 +31,8 @@ export default function SpellbookPanel({ characterId, characterClass }: Spellboo
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [expandedSpell, setExpandedSpell] = useState<string | null>(null);
+  const [castingSpell, setCastingSpell] = useState<SpellbookEntry | null>(null);
+  const [concentrationSpell, setConcentrationSpell] = useState<string | null>(null);
 
   useEffect(() => {
     loadSpellbook();
@@ -101,6 +104,20 @@ export default function SpellbookPanel({ characterId, characterClass }: Spellboo
     }
   }
 
+  async function handleCastInCombat(spell: SpellbookEntry, slotLevel?: number) {
+    const level = slotLevel ?? (spell.level ?? 0);
+    if (spell.concentration && concentrationSpell && concentrationSpell !== spell.name) {
+      if (!confirm(`Прервать концентрацию на "${concentrationSpell}" и наложить "${spell.name}"?`)) return;
+    }
+    if (level > 0) {
+      await handleUseSlot(level);
+    }
+    if (spell.concentration) {
+      setConcentrationSpell(spell.name ?? null);
+    }
+    setCastingSpell(null);
+  }
+
   const knownSpellIds = new Set(spells.map(s => s.spell_id));
   const filteredCatalog = catalog.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase());
@@ -128,16 +145,36 @@ export default function SpellbookPanel({ characterId, characterClass }: Spellboo
 
   function renderSpell(spell: SpellbookEntry) {
     const isExpanded = expandedSpell === spell.id;
+    const isConcentrating = concentrationSpell === spell.name;
+    const canCast = combatId && (spell.level === 0 || spell.is_prepared);
+
     return (
-      <div key={spell.id} className="border border-border rounded p-2 space-y-1">
+      <div key={spell.id} className={`border rounded p-2 space-y-1 ${isConcentrating ? 'border-purple-500/60 bg-purple-500/5' : 'border-border'}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-medium text-sm truncate">{spell.name}</span>
-            {spell.concentration && <Badge variant="outline" className="text-xs px-1">К</Badge>}
+            {spell.concentration && <Badge variant={isConcentrating ? 'default' : 'outline'} className="text-xs px-1" title="Концентрация">К</Badge>}
             {spell.ritual && <Badge variant="outline" className="text-xs px-1">Р</Badge>}
             {spell.school && <span className="text-xs text-muted-foreground">{SCHOOL_NAMES[spell.school] ?? spell.school}</span>}
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {canCast && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6 text-purple-400 border-purple-500/50 hover:bg-purple-500/10"
+                title="Применить в бою"
+                onClick={() => {
+                  if ((spell.level ?? 0) > 0) {
+                    setCastingSpell(spell);
+                  } else {
+                    handleCastInCombat(spell, 0);
+                  }
+                }}
+              >
+                <Zap className="h-3 w-3" />
+              </Button>
+            )}
             {(spell.level ?? 0) > 0 && (
               <Button
                 variant={spell.is_prepared ? 'default' : 'ghost'}
@@ -192,6 +229,21 @@ export default function SpellbookPanel({ characterId, characterClass }: Spellboo
             <Plus className="h-3 w-3 mr-1" /> Добавить
           </Button>
         </div>
+        {concentrationSpell && (
+          <div className="flex items-center justify-between mt-1 px-2 py-1 rounded bg-purple-500/10 border border-purple-500/30">
+            <span className="text-xs text-purple-400">
+              <Zap className="h-3 w-3 inline mr-1" />Концентрация: {concentrationSpell}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 text-purple-400 hover:text-destructive"
+              onClick={() => setConcentrationSpell(null)}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="flex-1 overflow-hidden p-3 space-y-3">
@@ -240,6 +292,35 @@ export default function SpellbookPanel({ characterId, characterClass }: Spellboo
           )}
         </ScrollArea>
       </CardContent>
+
+      {/* Диалог выбора ячейки для кастинга */}
+      <Dialog open={!!castingSpell} onOpenChange={open => { if (!open) setCastingSpell(null); }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Применить: {castingSpell?.name}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mb-3">Выберите уровень ячейки заклинания:</p>
+          <div className="space-y-2">
+            {slots
+              .filter(s => s.spell_level >= (castingSpell?.level ?? 1) && s.available > 0)
+              .map(s => (
+                <Button
+                  key={s.spell_level}
+                  variant="outline"
+                  className="w-full justify-between"
+                  onClick={() => castingSpell && handleCastInCombat(castingSpell, s.spell_level)}
+                >
+                  <span>{s.spell_level} уровень</span>
+                  <span className="text-xs text-muted-foreground">{s.available}/{s.max_slots} доступно</span>
+                </Button>
+              ))
+            }
+            {slots.filter(s => s.spell_level >= (castingSpell?.level ?? 1) && s.available > 0).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-2">Нет доступных ячеек нужного уровня</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">

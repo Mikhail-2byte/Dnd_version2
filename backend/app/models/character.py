@@ -41,6 +41,11 @@ class Character(Base):
     race_id = Column(GUID(), ForeignKey("races.id", ondelete="SET NULL"), nullable=True, index=True)
     background_id = Column(GUID(), ForeignKey("backgrounds.id", ondelete="SET NULL"), nullable=True, index=True)
 
+    # Currency
+    gold = Column(Integer, default=0, nullable=False)
+    silver = Column(Integer, default=0, nullable=False)
+    copper = Column(Integer, default=0, nullable=False)
+
     # Narrative fields
     character_history = Column(Text, nullable=True)
     equipment_and_features = Column(Text, nullable=True)
@@ -69,6 +74,9 @@ class Character(Base):
             'skill_proficiencies': self.skill_proficiencies,
             'saving_throw_proficiencies': self.saving_throw_proficiencies,
             'experience_points': self.experience_points,
+            'gold': self.gold,
+            'silver': self.silver,
+            'copper': self.copper,
             'character_history': self.character_history,
             'equipment_and_features': self.equipment_and_features,
             'avatar_url': self.avatar_url,

@@ -15,7 +15,7 @@ export default function CreateCharacter() {
         title: 'Персонаж создан!',
         description: `Персонаж "${data.name}" успешно создан`,
       });
-      navigate('/');
+      navigate('/characters');
     } catch (error: any) {
       console.error('Error creating character:', error);
       const errorMessage = error.response?.data?.detail || 'Ошибка создания персонажа';
@@ -30,7 +30,7 @@ export default function CreateCharacter() {
   return (
     <CharacterCreation
       onSubmit={handleSubmit}
-      onCancel={() => navigate('/')}
+      onCancel={() => navigate('/characters')}
     />
   );
 }

@@ -7,7 +7,7 @@ from ..models.race import Race, SubRace
 from ..models.background import Background
 from ..models.class_feature import ClassFeature
 from ..models.spell import Spell
-from ..models.item import Weapon, Armor
+from ..models.item import Weapon, Armor, Item
 from ..models.monster import Monster, MonsterAction
 
 logger = logging.getLogger(__name__)
@@ -96,6 +96,13 @@ def get_monsters(
     if cr_max is not None:
         q = q.filter(Monster.cr <= cr_max)
     return q.order_by(Monster.cr, Monster.name).all()
+
+
+def get_items(db: Session, category: Optional[str] = None) -> List[Item]:
+    q = db.query(Item)
+    if category:
+        q = q.filter(Item.category == category)
+    return q.order_by(Item.category, Item.name).all()
 
 
 def get_monster_by_slug(db: Session, slug: str) -> Monster:

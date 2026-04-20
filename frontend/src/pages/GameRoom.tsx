@@ -391,6 +391,7 @@ export default function GameRoom() {
                 <SpellbookPanel
                   characterId={selectedCharacterId}
                   characterClass={characters.find(c => c.id === selectedCharacterId)?.class ?? ''}
+                  combatId={activeCombatId}
                 />
               ) : (
                 <p className="text-muted-foreground text-center py-8">Выберите персонажа</p>

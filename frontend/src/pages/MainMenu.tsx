@@ -10,7 +10,7 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
-import { AlertCircle, Gamepad2, Users, Settings } from 'lucide-react';
+import { AlertCircle, Gamepad2, Users, Settings, UserCircle } from 'lucide-react';
 
 export default function MainMenu() {
   const { user } = useAuthStore();
@@ -98,6 +98,15 @@ export default function MainMenu() {
 
             {/* Кнопки в столбик */}
             <div className="flex flex-col gap-4">
+              <Button
+                onClick={() => navigate('/characters')}
+                variant="ghost"
+                className="w-full text-lg py-6 border-2 border-accent/50 hover:border-accent hover:bg-accent/10 text-foreground font-semibold"
+              >
+                <UserCircle className="w-5 h-5 mr-3" />
+                Мои персонажи
+              </Button>
+
               <Button
                 onClick={() => navigate('/create-game')}
                 variant="ghost"
