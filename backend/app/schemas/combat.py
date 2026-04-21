@@ -26,6 +26,11 @@ class CombatParticipantResponse(BaseModel):
     is_dead: Optional[bool] = False
     character_name: Optional[str] = None
     token_name: Optional[str] = None
+    # Monster data
+    monster_slug: Optional[str] = None
+    damage_resistances: Optional[List[str]] = None
+    damage_immunities: Optional[List[str]] = None
+    damage_vulnerabilities: Optional[List[str]] = None
 
     model_config = {"from_attributes": True}
 
@@ -60,6 +65,7 @@ class AttackRequest(BaseModel):
     advantage: Optional[str] = Field(None, description="'advantage' | 'disadvantage' | null")
     damage_dice: str = Field("1d6", description="Кости урона, напр. '1d8', '2d6'")
     damage_modifier: int = Field(0)
+    damage_type: str = Field("bludgeoning", description="Тип урона: fire, cold, slashing, ...")
 
 
 class DamageRequest(BaseModel):
@@ -105,3 +111,19 @@ class DeathSaveResult(BaseModel):
     death_saves_success: int
     death_saves_failure: int
     regained_hp: Optional[int] = None
+
+
+class SavingThrowRequest(BaseModel):
+    participant_id: UUID
+    ability: str = Field(..., description="strength|dexterity|constitution|intelligence|wisdom|charisma")
+    dc: int = Field(..., ge=1, le=30, description="Сложность (Difficulty Class)")
+
+
+class SavingThrowResult(BaseModel):
+    participant_id: UUID
+    ability: str
+    dc: int
+    roll: int
+    modifier: int
+    total: int
+    success: bool

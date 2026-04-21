@@ -272,96 +272,7 @@ def end_combat(db: Session, combat_id: UUID) -> CombatSession:
         )
 
 
-def perform_attack(
-    db: Session,
-    combat_id: UUID,
-    attacker_id: UUID,
-    target_id: UUID,
-    attack_roll: Optional[int] = None,
-    modifier: int = 0,
-    advantage: Optional[str] = None,  # "advantage" | "disadvantage" | None
-    damage_dice: str = "1d6",
-    damage_modifier: int = 0,
-) -> dict:
-    """Attack with optional advantage/disadvantage and critical hit support."""
-    try:
-        attacker = db.query(CombatParticipant).filter(
-            CombatParticipant.id == attacker_id, CombatParticipant.combat_id == combat_id
-        ).first()
-        target = db.query(CombatParticipant).filter(
-            CombatParticipant.id == target_id, CombatParticipant.combat_id == combat_id
-        ).first()
-        if not attacker:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attacker not found in combat")
-        if not target:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target not found in combat")
-
-        # Roll d20 with advantage/disadvantage
-        critical = False
-        auto_miss = False
-        if attack_roll is None:
-            roll1 = random.randint(1, 20)
-            if advantage == "advantage":
-                roll2 = random.randint(1, 20)
-                attack_roll = max(roll1, roll2)
-                rolls = [roll1, roll2]
-            elif advantage == "disadvantage":
-                roll2 = random.randint(1, 20)
-                attack_roll = min(roll1, roll2)
-                rolls = [roll1, roll2]
-            else:
-                attack_roll = roll1
-                rolls = [roll1]
-        else:
-            rolls = [attack_roll]
-
-        critical = attack_roll == 20
-        auto_miss = attack_roll == 1
-
-        total_attack = attack_roll + modifier
-        target_ac = target.armor_class
-
-        hit = critical or (not auto_miss and total_attack >= target_ac)
-
-        # Parse damage dice e.g. "1d6", "2d8"
-        damage = None
-        if hit:
-            try:
-                count_str, die_str = damage_dice.lower().split("d")
-                count = int(count_str) if count_str else 1
-                die = int(die_str)
-                if critical:
-                    count *= 2  # Double dice on crit
-                raw = sum(random.randint(1, die) for _ in range(count))
-                damage = max(1, raw + damage_modifier)
-            except Exception:
-                damage = max(1, random.randint(1, 6) + damage_modifier)
-
-        result = {
-            "hit": hit,
-            "attack_roll": attack_roll,
-            "rolls": rolls,
-            "modifier": modifier,
-            "total_attack": total_attack,
-            "target_ac": target_ac,
-            "critical": critical,
-            "auto_miss": auto_miss,
-            "advantage": advantage,
-            "damage": damage,
-            "damage_dice": damage_dice,
-        }
-        logger.info(f"Attack {attacker_id}->{target_id}: roll={attack_roll} mod={modifier} hit={hit} crit={critical} dmg={damage}")
-        return result
-
-    except HTTPException:
-        raise
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error performing attack: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при выполнении атаки")
-
-
-def apply_damage(db: Session, combat_id: UUID, participant_id: UUID, damage: int) -> CombatParticipant:
+def apply_damage(db: Session, combat_id: UUID, participant_id: UUID, damage: int, damage_type: Optional[str] = None) -> CombatParticipant:
     """
     Применение урона к участнику боя
     
@@ -389,6 +300,19 @@ def apply_damage(db: Session, combat_id: UUID, participant_id: UUID, damage: int
                 detail="Participant not found in combat"
             )
         
+        # Apply resistance/immunity/vulnerability if damage_type provided
+        if damage_type and damage > 0:
+            dt = damage_type.lower()
+            immunities = [i.lower() for i in (participant.damage_immunities or [])]
+            resistances = [r.lower() for r in (participant.damage_resistances or [])]
+            vulnerabilities = [v.lower() for v in (participant.damage_vulnerabilities or [])]
+            if dt in immunities:
+                damage = 0
+            elif dt in resistances:
+                damage = damage // 2
+            elif dt in vulnerabilities:
+                damage = damage * 2
+
         # Уменьшаем HP
         participant.current_hp = max(0, participant.current_hp - damage)
         
@@ -636,5 +560,66 @@ def perform_attack(
         "advantage": advantage,
         "damage": damage,
         "damage_dice": damage_dice,
+    }
+
+
+ABILITY_TO_ATTR = {
+    "strength": "strength",
+    "dexterity": "dexterity",
+    "constitution": "constitution",
+    "intelligence": "intelligence",
+    "wisdom": "wisdom",
+    "charisma": "charisma",
+}
+
+PROFICIENCY_BONUS = {1: 2, 2: 2, 3: 2, 4: 2, 5: 3, 6: 3, 7: 3, 8: 3,
+                     9: 4, 10: 4, 11: 4, 12: 4, 13: 5, 14: 5, 15: 5, 16: 5,
+                     17: 6, 18: 6, 19: 6, 20: 6}
+
+
+def roll_saving_throw(
+    db: Session, combat_id: UUID, participant_id: UUID, ability: str, dc: int
+) -> dict:
+    """Roll a saving throw for a combat participant."""
+    from ..models.character import Character
+
+    participant = db.query(CombatParticipant).filter(
+        CombatParticipant.id == participant_id,
+        CombatParticipant.combat_id == combat_id
+    ).first()
+    if not participant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
+
+    ability = ability.lower()
+    if ability not in ABILITY_TO_ATTR:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown ability: {ability}")
+
+    score = 10
+    proficiency_bonus = 2
+    has_proficiency = False
+
+    if participant.character_id:
+        char = db.query(Character).filter(Character.id == participant.character_id).first()
+        if char:
+            score = getattr(char, ABILITY_TO_ATTR[ability], 10)
+            proficiency_bonus = PROFICIENCY_BONUS.get(char.level, 2)
+            profs = char.saving_throw_proficiencies or []
+            has_proficiency = ability in profs
+
+    modifier = (score - 10) // 2
+    if has_proficiency:
+        modifier += proficiency_bonus
+
+    roll = random.randint(1, 20)
+    total = roll + modifier
+
+    return {
+        "participant_id": str(participant_id),
+        "ability": ability,
+        "dc": dc,
+        "roll": roll,
+        "modifier": modifier,
+        "total": total,
+        "success": total >= dc,
     }
 

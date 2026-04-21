@@ -25,6 +25,8 @@ from ..schemas.combat import (
     HealRequest,
     ConditionRequest,
     DeathSaveResult,
+    SavingThrowRequest,
+    SavingThrowResult,
 )
 from ..services.combat_service import (
     start_combat,
@@ -40,6 +42,7 @@ from ..services.combat_service import (
     apply_condition,
     remove_condition,
     roll_death_save,
+    roll_saving_throw,
 )
 from ..services.game_service import is_master, is_participant
 from ..sockets.game_events import (
@@ -81,8 +84,18 @@ def _participant_to_response(participant, db: Session) -> CombatParticipantRespo
         armor_class=participant.armor_class,
         conditions=participant.conditions,
         is_player_controlled=participant.is_player_controlled,
+        actions_used=participant.actions_used or 0,
+        bonus_actions_used=participant.bonus_actions_used or 0,
+        reaction_used=participant.reaction_used or False,
+        death_saves_success=participant.death_saves_success or 0,
+        death_saves_failure=participant.death_saves_failure or 0,
+        is_dead=participant.is_dead or False,
         character_name=character_name,
-        token_name=token_name
+        token_name=token_name,
+        monster_slug=participant.monster_slug,
+        damage_resistances=participant.damage_resistances,
+        damage_immunities=participant.damage_immunities,
+        damage_vulnerabilities=participant.damage_vulnerabilities,
     )
 
 
@@ -335,11 +348,11 @@ async def attack_endpoint(
         damage_dice=request.damage_dice,
         damage_modifier=request.damage_modifier,
     )
-    
-    # Если попали, наносим урон
+
+    # Если попали, наносим урон с учётом типа
     was_defeated = False
     if attack_result["hit"] and attack_result["damage"]:
-        target = apply_damage(db, combat_id, request.target_id, attack_result["damage"])
+        target = apply_damage(db, combat_id, request.target_id, attack_result["damage"], request.damage_type)
         
         # Если цель повержена, эмитим событие
         if target.current_hp <= 0:
@@ -395,8 +408,8 @@ async def damage_endpoint(
             detail="Combat session is not active"
         )
     
-    # Наносим урон
-    participant = apply_damage(db, combat_id, request.target_id, request.damage)
+    # Наносим урон с учётом типа
+    participant = apply_damage(db, combat_id, request.target_id, request.damage, request.damage_type)
     
     # Если участник повержен, эмитим событие
     was_defeated = participant.current_hp <= 0
@@ -529,6 +542,24 @@ async def death_save_endpoint(
     return roll_death_save(db, combat_id, participant_id)
 
 
+@router.post("/{combat_id}/saving-throw", response_model=SavingThrowResult)
+async def saving_throw_endpoint(
+    game_id: UUID,
+    combat_id: UUID,
+    request: SavingThrowRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Спасбросок для участника боя (d20 + модификатор хар-ки vs DC)."""
+    if not is_participant(db, game_id, current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Вы не участник этой игры")
+    combat = get_combat_session(db, combat_id)
+    if combat.game_id != game_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Combat not found")
+    result = roll_saving_throw(db, combat_id, request.participant_id, request.ability, request.dc)
+    return result
+
+
 @router.post("/{combat_id}/add-monster", response_model=CombatParticipantResponse, status_code=status.HTTP_201_CREATED)
 async def add_monster_to_combat_endpoint(
     game_id: UUID,
@@ -588,6 +619,10 @@ async def add_monster_to_combat_endpoint(
         max_hp=hp,
         armor_class=monster.armor_class or 10,
         is_player_controlled=False,
+        monster_slug=monster_slug,
+        damage_resistances=monster.damage_resistances or [],
+        damage_immunities=monster.damage_immunities or [],
+        damage_vulnerabilities=monster.damage_vulnerabilities or [],
     )
     db.add(participant)
     db.commit()

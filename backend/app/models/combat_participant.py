@@ -34,6 +34,12 @@ class CombatParticipant(Base):
     death_saves_failure = Column(Integer, nullable=True, default=0)
     is_dead = Column(Boolean, nullable=True, default=False)
 
+    # Monster reference and resistances (populated when adding monster to combat)
+    monster_slug = Column(String(255), nullable=True)
+    damage_resistances = Column(JSON, nullable=True)
+    damage_immunities = Column(JSON, nullable=True)
+    damage_vulnerabilities = Column(JSON, nullable=True)
+
     combat_session = relationship("CombatSession", back_populates="participants")
     character = relationship("Character", backref="combat_participations")
     token = relationship("Token", backref="combat_participations")

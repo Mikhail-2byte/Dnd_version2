@@ -414,6 +414,18 @@ export class SocketService {
     }
   }
 
+  onTurnChanged(callback: (data: CombatSession) => void): void {
+    if (this.socket) {
+      this.socket.on('combat:turn_changed', callback);
+    }
+  }
+
+  on(event: string, callback: (...args: any[]) => void): void {
+    if (this.socket) {
+      this.socket.on(event, callback);
+    }
+  }
+
   off(event: string): void {
     if (this.socket) {
       this.socket.off(event);

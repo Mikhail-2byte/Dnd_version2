@@ -333,6 +333,21 @@ export const combatAPI = {
     return response.data;
   },
 
+  savingThrow: async (
+    gameId: string, combatId: string,
+    participantId: string, ability: string, dc: number
+  ): Promise<{
+    participant_id: string; ability: string; dc: number;
+    roll: number; modifier: number; total: number; success: boolean;
+  }> => {
+    const response = await api.post(`/api/games/${gameId}/combat/${combatId}/saving-throw`, {
+      participant_id: participantId,
+      ability,
+      dc,
+    });
+    return response.data;
+  },
+
   addMonster: async (
     gameId: string, combatId: string, monsterSlug: string,
     opts?: { x?: number; y?: number; use_average_hp?: boolean; custom_name?: string }

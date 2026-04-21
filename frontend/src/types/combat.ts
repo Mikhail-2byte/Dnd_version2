@@ -20,6 +20,11 @@ export interface CombatParticipant {
   is_dead?: boolean;
   character_name?: string | null;
   token_name?: string | null;
+  // Monster data
+  monster_slug?: string | null;
+  damage_resistances?: string[] | null;
+  damage_immunities?: string[] | null;
+  damage_vulnerabilities?: string[] | null;
 }
 
 export interface CombatSession {
