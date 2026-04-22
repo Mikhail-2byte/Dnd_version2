@@ -7,14 +7,13 @@ import { socketService, type GameState } from '../services/socket';
 import { useToast } from '../hooks/use-toast';
 import GameMap from '../components/GameMap';
 import MasterScenarioPanel from '../components/MasterScenarioPanel';
-import MasterScenePanel from '../components/MasterScenePanel';
-import SceneDescription from '../components/SceneDescription';
 import CharacterPanel from '../components/CharacterPanel';
 import DiceRoller from '../components/DiceRoller';
 import CombatPanel from '../components/CombatPanel';
 import InventoryPanel from '../components/InventoryPanel';
 import SpellbookPanel from '../components/SpellbookPanel';
 import BestiaryBrowser from '../components/BestiaryBrowser';
+import HiddenObjectsPanel from '../components/HiddenObjectsPanel';
 import { Header } from '../components/Header';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -31,12 +30,15 @@ export default function GameRoom() {
   const {
     currentGame,
     tokens,
-    players,
+    participants,
     currentUserRole,
+    selectedCharacterId,
     setGame,
     setTokens,
     setPlayers,
+    setParticipants,
     setCurrentUserRole,
+    setSelectedCharacterId,
     reset,
   } = useGameStore();
   const { toast } = useToast();
@@ -45,12 +47,6 @@ export default function GameRoom() {
   const [activeTab, setActiveTab] = useState<'lobby' | 'characters' | 'dice' | 'combat' | 'inventory' | 'spells' | 'bestiary'>('lobby');
   const [activeCombatId, setActiveCombatId] = useState<string | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
-  const [currentSceneDescription, setCurrentSceneDescription] = useState<{
-    description: string;
-    title?: string | null;
-  } | null>(null);
-  const [isSceneVisible, setIsSceneVisible] = useState(false);
 
   useEffect(() => {
     if (!gameId || !token) {
@@ -70,31 +66,47 @@ export default function GameRoom() {
         console.log('GameRoom: Game loaded', game);
         setGame(game);
 
-        // Загружаем токены
-        const gameTokens = await gamesAPI.getTokens(gameId);
-        console.log('GameRoom: Tokens loaded', gameTokens);
-        setTokens(gameTokens);
-
         // Определяем роль сразу после загрузки игры
-        if (game.master_id === user?.id) {
+        const isMaster = game.master_id === user?.id;
+        if (isMaster) {
           setCurrentUserRole('master');
         } else {
           setCurrentUserRole('player');
+        }
+
+        // Загружаем токены — скрытые только для мастера
+        const gameTokens = await gamesAPI.getTokens(gameId);
+        console.log('GameRoom: Tokens loaded', gameTokens);
+        const visibleTokens = gameTokens.filter((t) => !t.is_hidden);
+        const hiddenTokens = gameTokens.filter((t) => t.is_hidden);
+        setTokens(visibleTokens);
+        if (isMaster) {
+          useGameStore.getState().setHiddenTokens(hiddenTokens);
         }
 
         // Загружаем персонажей: сначала из шаблона, если игра создана из шаблона
         try {
           const template = gameTemplates.find(t => t.name === game.name);
           if (template?.characters && template.characters.length > 0) {
-            // Используем персонажей из шаблона
             setCharacters(template.characters);
           } else {
-            // Иначе загружаем персонажей пользователя
-          const userCharacters = await charactersAPI.getAll();
-          setCharacters(userCharacters);
+            const userCharacters = await charactersAPI.getAll();
+            setCharacters(userCharacters);
           }
         } catch (err) {
           console.error('Failed to load characters:', err);
+        }
+
+        // Загружаем участников для цветовой маркировки и автовыбора персонажа
+        try {
+          const gameParticipants = await gamesAPI.getParticipants(gameId);
+          setParticipants(gameParticipants);
+          const myParticipant = gameParticipants.find(p => p.user_id === user?.id);
+          if (myParticipant?.character_id) {
+            setSelectedCharacterId(myParticipant.character_id);
+          }
+        } catch (err) {
+          console.error('Failed to load participants:', err);
         }
 
         // Подключаемся к WebSocket
@@ -127,20 +139,40 @@ export default function GameRoom() {
         socketService.onTokenCreated((data) => {
           console.log('GameRoom: Token created event received', data);
           const store = useGameStore.getState();
-          // Проверяем, есть ли временный токен с таким же именем
-          const existingTempToken = store.tokens.find(
-            (t) => t.name === data.token.name && t.id.startsWith('temp-')
-          );
-          if (existingTempToken) {
-            // Заменяем временный токен на реальный
-            console.log('Replacing temporary token with real one', {
-              tempId: existingTempToken.id,
-              realId: data.token.id
-            });
-            store.removeToken(existingTempToken.id);
+          if (data.token.is_hidden) {
+            // Скрытый токен — только в список скрытых (мастер)
+            store.addHiddenToken(data.token);
+          } else {
+            const existingTempToken = store.tokens.find(
+              (t) => t.name === data.token.name && t.id.startsWith('temp-')
+            );
+            if (existingTempToken) {
+              store.removeToken(existingTempToken.id);
+            }
+            store.addToken(data.token);
           }
-          store.addToken(data.token);
           console.log('Token added to store, current tokens:', store.tokens.length);
+        });
+
+        socketService.onTokenRevealed((data) => {
+          const store = useGameStore.getState();
+          const role = store.currentUserRole;
+          if (role === 'master') {
+            store.revealHiddenToken(data.token_id);
+          } else {
+            // Игрок — просто добавляем появившийся токен
+            store.addToken({
+              id: data.token_id,
+              game_id: gameId!,
+              name: data.name,
+              x: data.x,
+              y: data.y,
+              image_url: data.image_url,
+              is_hidden: false,
+              token_type: data.token_type as 'npc' | 'item' | 'player',
+              token_metadata: data.token_metadata,
+            });
+          }
         });
 
         socketService.onTokenDeleted((data) => {
@@ -159,16 +191,6 @@ export default function GameRoom() {
         socketService.onDiceRolled((data) => {
           // Обработка броска кубиков будет в DiceRoller компоненте
           console.log('Dice rolled:', data);
-        });
-
-        socketService.onSceneDescription((data) => {
-          if (data.game_id === gameId) {
-            setCurrentSceneDescription({
-              description: data.description,
-              title: data.title,
-            });
-            setIsSceneVisible(true);
-          }
         });
 
         socketService.onError((data) => {
@@ -329,22 +351,15 @@ export default function GameRoom() {
             </TabsList>
             
             <TabsContent value="lobby" className="relative w-full flex-1 min-h-0 overflow-hidden">
-              <GameMap 
-                gameId={gameId!} 
+              <GameMap
+                gameId={gameId!}
                 onCharacterSelect={setSelectedCharacterId}
                 characters={characters}
               />
               {currentUserRole === 'master' && (
-                <div className="absolute top-4 right-4 w-80 z-10 max-h-[calc(100vh-8rem)]">
-                  <MasterScenePanel gameId={gameId!} />
+                <div className="absolute bottom-4 right-4 w-72 z-10 max-h-[60vh] overflow-y-auto">
+                  <HiddenObjectsPanel gameId={gameId!} />
                 </div>
-              )}
-              {currentUserRole !== 'master' && currentSceneDescription && (
-                <SceneDescription
-                  description={currentSceneDescription.description}
-                  title={currentSceneDescription.title}
-                  isVisible={isSceneVisible}
-                />
               )}
             </TabsContent>
             
@@ -352,7 +367,9 @@ export default function GameRoom() {
               <CharacterPanel
                 characters={characters}
                 selectedId={selectedCharacterId}
-                onSelect={(character) => setSelectedCharacterId(character.id)}
+                participants={participants}
+                onSelect={currentUserRole === 'master' ? (character) => setSelectedCharacterId(character.id) : undefined}
+                showSelect={currentUserRole === 'master'}
               />
             </TabsContent>
         
@@ -374,6 +391,10 @@ export default function GameRoom() {
                   gameId={gameId!}
                   isMaster={currentUserRole === 'master'}
                   onCombatChange={setActiveCombatId}
+                  availableParticipants={[
+                    ...characters.map(c => ({ id: c.id, name: c.name, type: 'character' as const })),
+                    ...tokens.map(t => ({ id: t.id, name: t.name, type: 'token' as const })),
+                  ]}
                 />
               </div>
             </TabsContent>

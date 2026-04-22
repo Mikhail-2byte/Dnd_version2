@@ -9,27 +9,57 @@ import { Input } from './ui/input';
 import { combatAPI } from '../services/api';
 import { socketService } from '../services/socket';
 import type { CombatSession, CombatParticipant } from '../types/combat';
+import { CONDITIONS } from '../types/combat';
 import HPBar from './HPBar';
-import { Sword, Shield, Zap, X, Crosshair, SkipForward, Heart, Skull } from 'lucide-react';
+import { Sword, Shield, Zap, X, Crosshair, SkipForward, Heart, Skull, Plus, Minus } from 'lucide-react';
+
+const DAMAGE_TYPES: { value: string; label: string }[] = [
+  { value: 'bludgeoning', label: 'Дробящий' },
+  { value: 'piercing',    label: 'Колющий' },
+  { value: 'slashing',    label: 'Рубящий' },
+  { value: 'fire',        label: 'Огонь' },
+  { value: 'cold',        label: 'Холод' },
+  { value: 'lightning',   label: 'Молния' },
+  { value: 'thunder',     label: 'Гром' },
+  { value: 'acid',        label: 'Кислота' },
+  { value: 'poison',      label: 'Яд' },
+  { value: 'necrotic',    label: 'Некротика' },
+  { value: 'radiant',     label: 'Лучистый' },
+  { value: 'psychic',     label: 'Психический' },
+  { value: 'force',       label: 'Силовой' },
+];
+
+const DAMAGE_DICE = ['1d4', '1d6', '1d8', '1d10', '1d12', '2d6', '2d8', '2d10'];
+
+interface AvailableParticipant {
+  id: string;
+  name: string;
+  type: 'character' | 'token';
+}
 
 interface CombatPanelProps {
   gameId: string;
   isMaster: boolean;
   onCombatChange?: (combatId: string | null) => void;
+  availableParticipants?: AvailableParticipant[];
 }
 
-export default function CombatPanel({ gameId, isMaster, onCombatChange }: CombatPanelProps) {
+export default function CombatPanel({ gameId, isMaster, onCombatChange, availableParticipants = [] }: CombatPanelProps) {
   const [combat, setCombat] = useState<CombatSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedParticipants] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [attackDialogOpen, setAttackDialogOpen] = useState(false);
   const [attackingParticipant, setAttackingParticipant] = useState<CombatParticipant | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
   const [attackModifier, setAttackModifier] = useState(0);
+  const [damageDice, setDamageDice] = useState('1d6');
+  const [damageType, setDamageType] = useState('slashing');
+  const [attackAdvantage, setAttackAdvantage] = useState<'advantage' | 'disadvantage' | null>(null);
   const [lastAttackResult, setLastAttackResult] = useState<string | null>(null);
 
   const [deathSaveResult, setDeathSaveResult] = useState<Record<string, string>>({});
+  const [conditionMenuParticipantId, setConditionMenuParticipantId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCurrentCombat();
@@ -117,15 +147,26 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
     }
   };
 
+  const toggleParticipant = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleStartCombat = async () => {
-    if (selectedParticipants.length === 0) {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
       alert('Выберите участников для боя');
       return;
     }
     try {
       setIsLoading(true);
-      const newCombat = await combatAPI.start(gameId, { participant_ids: selectedParticipants });
+      const newCombat = await combatAPI.start(gameId, { participant_ids: ids });
       updateCombat(newCombat);
+      setSelectedIds(new Set());
     } catch (error: any) {
       alert(error.response?.data?.detail || 'Ошибка при начале боя');
     } finally {
@@ -172,6 +213,9 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
     setAttackingParticipant(participant);
     setSelectedTargetId('');
     setAttackModifier(0);
+    setDamageDice('1d6');
+    setDamageType('slashing');
+    setAttackAdvantage(null);
     setLastAttackResult(null);
     setAttackDialogOpen(true);
   };
@@ -182,6 +226,9 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
       setIsLoading(true);
       const result = await combatAPI.attack(gameId, combat.id, attackingParticipant.id, selectedTargetId, {
         modifier: attackModifier,
+        damageDice,
+        damageType,
+        advantage: attackAdvantage ?? undefined,
       });
       const target = orderedParticipants.find(p => p.id === selectedTargetId);
       const targetName = target?.character_name || target?.token_name || 'Цель';
@@ -218,6 +265,20 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
     }
   };
 
+  const handleManageCondition = async (participantId: string, condition: string, action: 'add' | 'remove') => {
+    if (!combat) return;
+    try {
+      const updated = await combatAPI.manageCondition(gameId, combat.id, participantId, action, condition);
+      setCombat(prev => prev ? {
+        ...prev,
+        participants: prev.participants.map(p => p.id === participantId ? { ...p, conditions: updated.conditions } : p),
+      } : prev);
+      setConditionMenuParticipantId(null);
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Ошибка изменения состояния');
+    }
+  };
+
   const orderedParticipants = combat
     ? [...combat.participants].sort((a, b) => (b.initiative ?? -1) - (a.initiative ?? -1))
     : [];
@@ -227,13 +288,10 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
       ? orderedParticipants[combat.current_turn_index % orderedParticipants.length]
       : null;
 
-  const isCurrentUserTurn = currentParticipant?.is_player_controlled &&
-    !isMaster; // simplified check — player controls their own turn
-
   if (!combat) {
     if (!isMaster) return null;
     return (
-      <Card>
+      <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sword className="w-5 h-5" />
@@ -241,22 +299,47 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Выберите участников для начала боевой сессии
-          </p>
-          <Button onClick={handleStartCombat} disabled={isLoading || selectedParticipants.length === 0}>
-            Начать бой
+          {availableParticipants.length === 0 ? (
+            <p className="text-sm text-muted-foreground mb-4">
+              Нет доступных участников. Добавьте токены на карту или убедитесь, что есть персонажи.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm font-medium mb-3">Выберите участников боя:</p>
+              <ScrollArea className="h-48 mb-4">
+                <div className="space-y-2 pr-2">
+                  {availableParticipants.map(p => (
+                    <label key={p.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(p.id)}
+                        onChange={() => toggleParticipant(p.id)}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <span className="flex-1 text-sm">{p.name}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {p.type === 'character' ? 'Персонаж' : 'Токен'}
+                      </Badge>
+                    </label>
+                  ))}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+          <Button
+            onClick={handleStartCombat}
+            disabled={isLoading || selectedIds.size === 0}
+            className="w-full"
+          >
+            Начать бой ({selectedIds.size} участников)
           </Button>
-          <p className="text-xs text-muted-foreground mt-4">
-            Примечание: Выбор участников будет реализован в следующем шаге
-          </p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="w-full max-w-md">
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="flex items-center gap-2">
@@ -288,6 +371,7 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
               const participantName = participant.character_name || participant.token_name || 'Неизвестно';
               const isDying = participant.current_hp <= 0 && !participant.is_dead;
               const isDead = participant.is_dead;
+              const canAttack = !isDead && !isDying && (isMaster || isCurrentTurn);
 
               return (
                 <div
@@ -371,15 +455,53 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
                   )}
 
                   {/* Conditions */}
-                  {participant.conditions && participant.conditions.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {participant.conditions.map((condition, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs">
-                          {condition}
+                  <div className="mb-2">
+                    <div className="flex flex-wrap gap-1">
+                      {(participant.conditions ?? []).map((cond) => (
+                        <Badge
+                          key={cond}
+                          variant="outline"
+                          className={`text-xs pr-1 flex items-center gap-0.5 cursor-pointer hover:bg-destructive/20 ${CONDITIONS[cond]?.color ?? ''}`}
+                          onClick={() => (isMaster || isCurrentTurn) && handleManageCondition(participant.id, cond, 'remove')}
+                          title="Нажмите для удаления"
+                        >
+                          {CONDITIONS[cond]?.icon ?? ''} {CONDITIONS[cond]?.label ?? cond}
+                          {(isMaster || isCurrentTurn) && <Minus className="w-2.5 h-2.5 ml-0.5" />}
                         </Badge>
                       ))}
+                      {(isMaster || isCurrentTurn) && !isDead && (
+                        <div className="relative">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-5 w-5 p-0 text-xs"
+                            title="Добавить состояние"
+                            onClick={() => setConditionMenuParticipantId(
+                              conditionMenuParticipantId === participant.id ? null : participant.id
+                            )}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                          {conditionMenuParticipantId === participant.id && (
+                            <div className="absolute z-50 top-6 left-0 bg-popover border border-border rounded shadow-lg p-1 w-44 max-h-56 overflow-y-auto">
+                              {Object.entries(CONDITIONS)
+                                .filter(([key]) => !['dead', 'unconscious'].includes(key) && !(participant.conditions ?? []).includes(key))
+                                .map(([key, info]) => (
+                                  <button
+                                    key={key}
+                                    className="w-full text-left text-xs px-2 py-1 hover:bg-muted rounded flex items-center gap-1.5"
+                                    onClick={() => handleManageCondition(participant.id, key, 'add')}
+                                  >
+                                    <span>{info.icon}</span>
+                                    <span>{info.label}</span>
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {/* Death save section */}
                   {isDying && (
@@ -411,7 +533,7 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
                   )}
 
                   {/* Attack button */}
-                  {!isDead && !isDying && (isMaster || participant.is_player_controlled) && (
+                  {canAttack && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -437,6 +559,7 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
             <DialogTitle>Атака — {attackingParticipant?.character_name || attackingParticipant?.token_name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Target */}
             <div>
               <label className="text-sm font-medium mb-2 block">Цель</label>
               <Select value={selectedTargetId} onValueChange={setSelectedTargetId}>
@@ -454,6 +577,8 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Attack modifier */}
             <div>
               <label className="text-sm font-medium mb-2 block">Модификатор атаки</label>
               <Input
@@ -463,6 +588,68 @@ export default function CombatPanel({ gameId, isMaster, onCombatChange }: Combat
                 placeholder="0"
               />
             </div>
+
+            {/* Damage dice */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Кости урона</label>
+              <Select value={damageDice} onValueChange={setDamageDice}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAMAGE_DICE.map(d => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Damage type */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Тип урона</label>
+              <Select value={damageType} onValueChange={setDamageType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAMAGE_TYPES.map(dt => (
+                    <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Advantage / Disadvantage */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Бросок атаки</label>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={attackAdvantage === 'disadvantage' ? 'destructive' : 'outline'}
+                  onClick={() => setAttackAdvantage(prev => prev === 'disadvantage' ? null : 'disadvantage')}
+                  className="flex-1"
+                >
+                  Помеха
+                </Button>
+                <Button
+                  size="sm"
+                  variant={attackAdvantage === null ? 'secondary' : 'outline'}
+                  onClick={() => setAttackAdvantage(null)}
+                  className="flex-1"
+                >
+                  Обычный
+                </Button>
+                <Button
+                  size="sm"
+                  variant={attackAdvantage === 'advantage' ? 'default' : 'outline'}
+                  onClick={() => setAttackAdvantage(prev => prev === 'advantage' ? null : 'advantage')}
+                  className="flex-1"
+                >
+                  Преимущество
+                </Button>
+              </div>
+            </div>
+
             <p className="text-xs text-muted-foreground">
               d20 бросается автоматически. Попадание: бросок + модификатор ≥ КБ цели.
             </p>

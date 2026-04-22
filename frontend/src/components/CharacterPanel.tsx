@@ -3,7 +3,7 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Shield, Heart, Sword, Zap, Brain, Users, Info } from 'lucide-react';
+import { Shield, Heart, Sword, Zap, Brain, Users, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Character } from '../types/character';
 import type { Participant } from '../types/game';
 import CharacterDetailDialog from './CharacterDetailDialog';
@@ -16,6 +16,7 @@ interface CharacterPanelProps {
   onSelect?: (character: Character) => void;
   onEdit?: (character: Character) => void;
   onDelete?: (character: Character) => void;
+  showSelect?: boolean;
 }
 
 function fallbackHP(level: number, constitution: number): number {
@@ -27,6 +28,49 @@ function fallbackAC(dexterity: number): number {
   return 10 + Math.floor((dexterity - 10) / 2);
 }
 
+// D&D 5e 18 skills: {key, Russian name, ability}
+const SKILLS: { key: string; label: string; ability: keyof Character }[] = [
+  { key: 'acrobatics',      label: 'Акробатика',        ability: 'dexterity'    },
+  { key: 'animal_handling', label: 'Уход за животными',  ability: 'wisdom'       },
+  { key: 'arcana',          label: 'Магия',              ability: 'intelligence' },
+  { key: 'athletics',       label: 'Атлетика',           ability: 'strength'     },
+  { key: 'deception',       label: 'Обман',              ability: 'charisma'     },
+  { key: 'history',         label: 'История',            ability: 'intelligence' },
+  { key: 'insight',         label: 'Проницательность',   ability: 'wisdom'       },
+  { key: 'intimidation',    label: 'Запугивание',        ability: 'charisma'     },
+  { key: 'investigation',   label: 'Анализ',             ability: 'intelligence' },
+  { key: 'medicine',        label: 'Медицина',           ability: 'wisdom'       },
+  { key: 'nature',          label: 'Природа',            ability: 'intelligence' },
+  { key: 'perception',      label: 'Внимательность',     ability: 'wisdom'       },
+  { key: 'performance',     label: 'Выступление',        ability: 'charisma'     },
+  { key: 'persuasion',      label: 'Убеждение',          ability: 'charisma'     },
+  { key: 'religion',        label: 'Религия',            ability: 'intelligence' },
+  { key: 'sleight_of_hand', label: 'Ловкость рук',       ability: 'dexterity'    },
+  { key: 'stealth',         label: 'Скрытность',         ability: 'dexterity'    },
+  { key: 'survival',        label: 'Выживание',          ability: 'wisdom'       },
+];
+
+const SAVE_ABILITIES: { key: string; label: string; ability: keyof Character }[] = [
+  { key: 'strength',     label: 'СИЛ', ability: 'strength'     },
+  { key: 'dexterity',    label: 'ЛОВ', ability: 'dexterity'    },
+  { key: 'constitution', label: 'ТЕЛ', ability: 'constitution' },
+  { key: 'intelligence', label: 'ИНТ', ability: 'intelligence' },
+  { key: 'wisdom',       label: 'МДР', ability: 'wisdom'       },
+  { key: 'charisma',     label: 'ХАР', ability: 'charisma'     },
+];
+
+function profBonus(level: number): number {
+  return Math.floor((level - 1) / 4) + 2;
+}
+
+function mod(score: number): number {
+  return Math.floor((score - 10) / 2);
+}
+
+function fmtMod(n: number): string {
+  return (n >= 0 ? '+' : '') + n;
+}
+
 export default function CharacterPanel({
   characters,
   selectedId,
@@ -34,9 +78,11 @@ export default function CharacterPanel({
   onSelect,
   onEdit,
   onDelete,
+  showSelect = true,
 }: CharacterPanelProps) {
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   
   // Создаем карту цветов для участников
   const playerColorMap = createPlayerColorMap(participants);
@@ -152,14 +198,16 @@ export default function CharacterPanel({
 
                 {/* Кнопки действий */}
                 <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-border">
-                  <Button
-                    onClick={() => handleSelectCharacter(character)}
-                    variant={isSelected ? "default" : "outline"}
-                    size="sm"
-                    className="flex-1 text-xs"
-                  >
-                    {isSelected ? 'Выбран' : 'Выбрать'}
-                  </Button>
+                  {showSelect && (
+                    <Button
+                      onClick={() => handleSelectCharacter(character)}
+                      variant={isSelected ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1 text-xs"
+                    >
+                      {isSelected ? 'Выбран' : 'Выбрать'}
+                    </Button>
+                  )}
                   <Button
                     onClick={() => handleShowDetails(character)}
                     variant="ghost"
@@ -167,9 +215,75 @@ export default function CharacterPanel({
                     className="flex-1 text-xs"
                   >
                     <Info className="w-3 h-3 mr-1.5" />
-                    Подробнее
+                    Детали
                   </Button>
                 </div>
+
+                {/* Expand toggle */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-xs text-muted-foreground h-6 mt-1"
+                  onClick={() => setExpandedId(expandedId === character.id ? null : character.id)}
+                >
+                  {expandedId === character.id
+                    ? <><ChevronUp className="w-3 h-3 mr-1" />Скрыть</>
+                    : <><ChevronDown className="w-3 h-3 mr-1" />Умения и спасброски</>}
+                </Button>
+
+                {/* Expanded section */}
+                {expandedId === character.id && (() => {
+                  const pb = character.proficiency_bonus ?? profBonus(character.level || 1);
+                  const saves = character.saving_throw_proficiencies ?? [];
+                  const skillProfs = character.skill_proficiencies ?? [];
+                  const dexMod = mod(character.dexterity);
+                  return (
+                    <div className="pt-1 border-t border-border space-y-2 text-xs">
+                      {/* Quick stats row */}
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Инициатива: <span className="text-foreground font-medium">{fmtMod(dexMod)}</span></span>
+                        <span>Проф.: <span className="text-foreground font-medium">+{pb}</span></span>
+                        <span>Скорость: <span className="text-foreground font-medium">30 фт.</span></span>
+                      </div>
+
+                      {/* Saving throws */}
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1 font-semibold">Спасброски</p>
+                        <div className="grid grid-cols-3 gap-1">
+                          {SAVE_ABILITIES.map(({ key, label, ability }) => {
+                            const isProficient = saves.includes(key);
+                            const bonus = mod(character[ability] as number) + (isProficient ? pb : 0);
+                            return (
+                              <div key={key} className={`flex items-center gap-0.5 rounded px-1 py-0.5 ${isProficient ? 'bg-primary/10' : 'bg-muted/30'}`}>
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${isProficient ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                                <span className="text-muted-foreground">{label}</span>
+                                <span className={`ml-auto font-medium ${isProficient ? 'text-primary' : 'text-foreground'}`}>{fmtMod(bonus)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Skills */}
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1 font-semibold">Умения</p>
+                        <div className="grid grid-cols-2 gap-0.5">
+                          {SKILLS.map(({ key, label, ability }) => {
+                            const isProficient = skillProfs.includes(key);
+                            const bonus = mod(character[ability] as number) + (isProficient ? pb : 0);
+                            return (
+                              <div key={key} className="flex items-center gap-0.5">
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isProficient ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                                <span className={`truncate ${isProficient ? 'text-foreground' : 'text-muted-foreground'}`}>{label}</span>
+                                <span className={`ml-auto font-medium shrink-0 ${isProficient ? 'text-primary' : ''}`}>{fmtMod(bonus)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </Card>
           );

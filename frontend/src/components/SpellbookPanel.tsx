@@ -30,6 +30,7 @@ export default function SpellbookPanel({ characterId, characterClass, combatId }
   const [catalog, setCatalog] = useState<SpellData[]>([]);
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
+  const [schoolFilter, setSchoolFilter] = useState<string>('all');
   const [expandedSpell, setExpandedSpell] = useState<string | null>(null);
   const [castingSpell, setCastingSpell] = useState<SpellbookEntry | null>(null);
   const [concentrationSpell, setConcentrationSpell] = useState<string | null>(null);
@@ -126,8 +127,12 @@ export default function SpellbookPanel({ characterId, characterClass, combatId }
     return matchSearch && matchLevel && notKnown;
   });
 
-  const cantrips = spells.filter(s => s.level === 0);
-  const spellsByLevel = spells.filter(s => (s.level ?? 0) > 0).reduce((acc, s) => {
+  const filteredSpells = schoolFilter === 'all'
+    ? spells
+    : spells.filter(s => s.school === schoolFilter);
+
+  const cantrips = filteredSpells.filter(s => s.level === 0);
+  const spellsByLevel = filteredSpells.filter(s => (s.level ?? 0) > 0).reduce((acc, s) => {
     const lvl = s.level ?? 1;
     if (!acc[lvl]) acc[lvl] = [];
     acc[lvl].push(s);
@@ -221,13 +226,26 @@ export default function SpellbookPanel({ characterId, characterClass, combatId }
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-base flex items-center gap-2">
             <BookOpen className="h-4 w-4" /> Спеллбук
           </CardTitle>
-          <Button size="sm" variant="outline" onClick={openAddDialog}>
-            <Plus className="h-3 w-3 mr-1" /> Добавить
-          </Button>
+          <div className="flex items-center gap-2">
+            <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+              <SelectTrigger className="w-32 h-7 text-xs">
+                <SelectValue placeholder="Школа" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все школы</SelectItem>
+                {Object.entries(SCHOOL_NAMES).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" onClick={openAddDialog}>
+              <Plus className="h-3 w-3 mr-1" /> Добавить
+            </Button>
+          </div>
         </div>
         {concentrationSpell && (
           <div className="flex items-center justify-between mt-1 px-2 py-1 rounded bg-purple-500/10 border border-purple-500/30">

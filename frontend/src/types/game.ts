@@ -15,6 +15,9 @@ export interface Token {
   x: number;
   y: number;
   image_url: string | null;
+  is_hidden: boolean;
+  token_type: 'npc' | 'item' | 'player';
+  token_metadata: Record<string, unknown> | null;
 }
 
 export interface Player {
@@ -31,5 +34,24 @@ export interface Participant {
   role: string;
   is_ready: boolean;
   character_id?: string;
+}
+
+export interface LogEvent {
+  id: string;
+  type: 'attack' | 'damage' | 'heal' | 'death' | 'condition' | 'scene' | 'roll' | 'system';
+  message: string;
+  timestamp: string;
+  isCritical?: boolean;
+  actorName?: string;
+  targetName?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  userName: string;
+  message: string;
+  timestamp: string;
+  isOOC: boolean;
 }
 

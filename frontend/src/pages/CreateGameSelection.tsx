@@ -7,7 +7,7 @@ import type { GameTemplate } from '../types/gameTemplate';
 import { gamesAPI } from '../services/api';
 import { useToast } from '../hooks/use-toast';
 import { useState } from 'react';
-import { Plus, ArrowLeft } from 'lucide-react';
+import { Plus, ArrowLeft, BookOpen } from 'lucide-react';
 
 export default function CreateGameSelection() {
   const navigate = useNavigate();
@@ -71,14 +71,25 @@ export default function CreateGameSelection() {
                   </p>
                 </div>
               </div>
-              <Button
-                onClick={() => navigate('/create-game/new')}
-                className="gap-2"
-                size="lg"
-              >
-                <Plus className="w-5 h-5" />
-                Создать новую игру
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => navigate('/scenarios')}
+                  variant="outline"
+                  className="gap-2"
+                  size="lg"
+                >
+                  <BookOpen className="w-5 h-5" />
+                  Мои сценарии
+                </Button>
+                <Button
+                  onClick={() => navigate('/create-game/new')}
+                  className="gap-2"
+                  size="lg"
+                >
+                  <Plus className="w-5 h-5" />
+                  Создать новую игру
+                </Button>
+              </div>
             </div>
 
             <div className="relative">

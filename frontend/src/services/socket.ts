@@ -116,67 +116,26 @@ export class SocketService {
     }
   }
 
-  createToken(gameId: string, name: string, x: number, y: number, imageUrl?: string): void {
-    console.log('socketService.createToken called:', { 
-      gameId, 
-      name, 
-      x, 
-      y, 
-      imageUrl, 
-      socketExists: !!this.socket,
-      socketConnected: this.socket?.connected,
-      socketId: this.socket?.id,
-      socketDisconnected: this.socket?.disconnected
-    });
-    
+  createToken(gameId: string, name: string, x: number, y: number, imageUrl?: string, tokenType = 'player'): void {
     if (!this.socket) {
       console.error('Socket not initialized, cannot create token');
-      console.error('SocketService state:', {
-        socketExists: !!this.socket,
-        currentGameId: this.currentGameId,
-        socketServiceInstance: this
-      });
-      // Попробуем переподключиться, если есть токен
-      console.warn('Attempting to reconnect...');
       return;
     }
 
-    // Если socket еще не подключен, ждем подключения
+    const payload = { game_id: gameId, name, x, y, image_url: imageUrl, token_type: tokenType };
+
     if (!this.socket.connected) {
-      console.warn('Socket not connected yet, waiting for connection...', {
-        socketId: this.socket.id,
-        disconnected: this.socket.disconnected
-      });
-      
-      // Проверяем, не отключен ли socket полностью
       if (this.socket.disconnected) {
         console.error('Socket is disconnected, cannot create token');
         return;
       }
-
       this.socket.once('connect', () => {
-        console.log('Socket connected, creating token now');
-        this.socket!.emit('token:create', {
-          game_id: gameId,
-          name,
-          x,
-          y,
-          image_url: imageUrl,
-        });
-        console.log('Token create event emitted (after wait)');
+        this.socket!.emit('token:create', payload);
       });
       return;
     }
-    
-    // Socket подключен, создаем токен сразу
-    this.socket.emit('token:create', {
-      game_id: gameId,
-      name,
-      x,
-      y,
-      image_url: imageUrl,
-    });
-    console.log('Token create event emitted successfully');
+
+    this.socket.emit('token:create', payload);
   }
 
   deleteToken(gameId: string, tokenId: string): void {
@@ -245,6 +204,8 @@ export class SocketService {
     faces: number;
     rolls: Array<{ die_id: string; value: number }>;
     total: number;
+    modifier?: number;
+    roll_type?: string;
   }) => void): void {
     if (this.socket) {
       this.socket.on('dice:rolled', callback);
@@ -417,6 +378,45 @@ export class SocketService {
   onTurnChanged(callback: (data: CombatSession) => void): void {
     if (this.socket) {
       this.socket.on('combat:turn_changed', callback);
+    }
+  }
+
+  sendChatMessage(gameId: string, message: string, isOOC: boolean): void {
+    if (this.socket) {
+      this.socket.emit('game:send_message', { game_id: gameId, message, is_ooc: isOOC });
+    }
+  }
+
+  onChatMessage(callback: (data: {
+    id: string;
+    user_id: string;
+    username: string;
+    message: string;
+    timestamp: string;
+    is_ooc: boolean;
+  }) => void): void {
+    if (this.socket) {
+      this.socket.on('game:chat_message', callback);
+    }
+  }
+
+  onTokenRevealed(callback: (data: {
+    token_id: string;
+    name: string;
+    x: number;
+    y: number;
+    image_url: string | null;
+    token_type: string;
+    token_metadata: Record<string, unknown> | null;
+  }) => void): void {
+    if (this.socket) {
+      this.socket.on('token:revealed', callback);
+    }
+  }
+
+  offTokenRevealed(): void {
+    if (this.socket) {
+      this.socket.off('token:revealed');
     }
   }
 

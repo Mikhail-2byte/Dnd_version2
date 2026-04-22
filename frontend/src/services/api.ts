@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { TokenResponse, User, UserStats } from '../types/user';
 import type { GameSession, Token } from '../types/game';
+import type { Scenario, ScenarioListItem, ScenarioNPC, ScenarioHiddenItem } from '../types/scenario';
 import type {
   Character, CharacterCreate, CharacterUpdate, RaceData, BackgroundData,
   InventoryItem, WeaponData, ArmorData, ItemData,
@@ -154,6 +155,21 @@ export const gamesAPI = {
     const response = await api.get<{ started: boolean }>(`/api/games/${gameId}/status`);
     return response.data;
   },
+
+  revealToken: async (gameId: string, tokenId: string): Promise<Token> => {
+    const response = await api.post<Token>(`/api/games/${gameId}/tokens/${tokenId}/reveal`);
+    return response.data;
+  },
+
+  giveItem: async (gameId: string, data: {
+    character_id: string;
+    item_type: string;
+    item_id: string;
+    quantity?: number;
+  }): Promise<{ message: string; inventory_id: string }> => {
+    const response = await api.post(`/api/games/${gameId}/give-item`, data);
+    return response.data;
+  },
 };
 
 export const charactersAPI = {
@@ -281,7 +297,7 @@ export const combatAPI = {
 
   attack: async (
     gameId: string, combatId: string, attackerId: string, targetId: string,
-    opts: { attackRoll?: number; modifier?: number; advantage?: string; damageDice?: string; damageModifier?: number } = {}
+    opts: { attackRoll?: number; modifier?: number; advantage?: string; damageDice?: string; damageModifier?: number; damageType?: string } = {}
   ): Promise<{
     hit: boolean; attack_roll: number; rolls: number[]; modifier: number;
     total_attack: number; target_ac: number; critical: boolean; auto_miss: boolean;
@@ -295,6 +311,7 @@ export const combatAPI = {
       advantage: opts.advantage ?? null,
       damage_dice: opts.damageDice ?? '1d6',
       damage_modifier: opts.damageModifier ?? 0,
+      damage_type: opts.damageType ?? null,
     });
     return response.data;
   },
@@ -462,6 +479,76 @@ export const spellbookAPI = {
   initializeSlots: async (characterId: string): Promise<{ slots_initialized: number }> => {
     const response = await api.post(`/api/characters/${characterId}/spell-slots/initialize`);
     return response.data;
+  },
+};
+
+export const scenariosAPI = {
+  list: async (): Promise<ScenarioListItem[]> => {
+    const response = await api.get<ScenarioListItem[]>('/api/scenarios');
+    return response.data;
+  },
+
+  create: async (data: { name: string; story?: string; map_url?: string }): Promise<Scenario> => {
+    const response = await api.post<Scenario>('/api/scenarios', data);
+    return response.data;
+  },
+
+  get: async (id: string): Promise<Scenario> => {
+    const response = await api.get<Scenario>(`/api/scenarios/${id}`);
+    return response.data;
+  },
+
+  update: async (id: string, data: { name?: string; story?: string; map_url?: string }): Promise<Scenario> => {
+    const response = await api.put<Scenario>(`/api/scenarios/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/api/scenarios/${id}`);
+  },
+
+  uploadMap: async (scenarioId: string, file: File): Promise<{ map_url: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<{ map_url: string }>(
+      `/api/scenarios/${scenarioId}/upload-map`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
+  launch: async (id: string): Promise<GameSession> => {
+    const response = await api.post<GameSession>(`/api/scenarios/${id}/launch`);
+    return response.data;
+  },
+
+  addNpc: async (scenarioId: string, data: Omit<ScenarioNPC, 'id' | 'scenario_id'>): Promise<ScenarioNPC> => {
+    const response = await api.post<ScenarioNPC>(`/api/scenarios/${scenarioId}/npcs`, data);
+    return response.data;
+  },
+
+  updateNpc: async (scenarioId: string, npcId: string, data: Partial<Omit<ScenarioNPC, 'id' | 'scenario_id'>>): Promise<ScenarioNPC> => {
+    const response = await api.put<ScenarioNPC>(`/api/scenarios/${scenarioId}/npcs/${npcId}`, data);
+    return response.data;
+  },
+
+  deleteNpc: async (scenarioId: string, npcId: string): Promise<void> => {
+    await api.delete(`/api/scenarios/${scenarioId}/npcs/${npcId}`);
+  },
+
+  addItem: async (scenarioId: string, data: Omit<ScenarioHiddenItem, 'id' | 'scenario_id'>): Promise<ScenarioHiddenItem> => {
+    const response = await api.post<ScenarioHiddenItem>(`/api/scenarios/${scenarioId}/items`, data);
+    return response.data;
+  },
+
+  updateItem: async (scenarioId: string, itemId: string, data: Partial<Omit<ScenarioHiddenItem, 'id' | 'scenario_id'>>): Promise<ScenarioHiddenItem> => {
+    const response = await api.put<ScenarioHiddenItem>(`/api/scenarios/${scenarioId}/items/${itemId}`, data);
+    return response.data;
+  },
+
+  deleteItem: async (scenarioId: string, itemId: string): Promise<void> => {
+    await api.delete(`/api/scenarios/${scenarioId}/items/${itemId}`);
   },
 };
 

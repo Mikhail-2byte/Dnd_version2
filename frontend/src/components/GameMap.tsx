@@ -1,12 +1,16 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { useGameStore } from '../store/gameStore';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { ZoomIn, ZoomOut, RotateCcw, Maximize2, Users } from 'lucide-react';
 import type { Character } from '../types/character';
+import type { MonsterListItem } from '../types/character';
+import { gameDataAPI } from '../services/api';
 import TokenWrapper from './TokenWrapper';
 import { useTokenHandlers } from '../hooks/useTokenHandlers';
 import { useMapDragDrop } from '../hooks/useMapDragDrop';
@@ -26,14 +30,22 @@ export default function GameMap({ gameId, characters = [] }: GameMapProps) {
   const [isHeroesPopoverOpen, setIsHeroesPopoverOpen] = useState(false);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [deadTokens, setDeadTokens] = useState<Set<string>>(new Set());
+  const [monsters, setMonsters] = useState<MonsterListItem[]>([]);
+  const [npcSearch, setNpcSearch] = useState('');
 
   const canMoveTokens = currentUserRole === 'master';
+
+  useEffect(() => {
+    if (canMoveTokens) {
+      gameDataAPI.getMonsters().then(setMonsters).catch(() => {});
+    }
+  }, [canMoveTokens]);
 
   const { handleTokenMove, handleTokenClick, handleDeleteToken, handleToggleDead } =
     useTokenHandlers({ gameId, canMoveTokens, tokens, setDeadTokens, setSelectedTokenId });
 
-  const { isDragging, setDraggedCharacter, setIsDragging, handleCharacterDragStart } =
-    useMapDragDrop({ gameId, characters, canMoveTokens, mapRef, setIsHeroesPopoverOpen });
+  const { isDragging, setDraggedCharacter, setDraggedNPC, setIsDragging, handleCharacterDragStart, handleNPCDragStart } =
+    useMapDragDrop({ gameId, characters, npcMonsters: monsters, canMoveTokens, mapRef, setIsHeroesPopoverOpen });
 
   const availableCharacters = characters.filter((character) => {
     return !tokens.some((token) => token.name === character.name);
@@ -144,51 +156,105 @@ export default function GameMap({ gameId, characters = [] }: GameMapProps) {
                       className="bg-card/90 backdrop-blur-sm border-2 border-border w-full justify-start"
                     >
                       <Users className="w-4 h-4 mr-2" />
-                      Герои
+                      Токены
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64 p-2" align="start">
-                    {availableCharacters.length === 0 ? (
-                      <div className="text-sm text-muted-foreground text-center py-4">
-                        Все герои уже на карте
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {availableCharacters.map((character) => (
-                          <div
-                            key={character.id}
-                            draggable
-                            onDragStart={(e) => {
-                              handleCharacterDragStart(character);
-                              e.dataTransfer.effectAllowed = 'move';
-                              e.dataTransfer.setData('text/plain', character.id);
-                            }}
-                            onDragEnd={() => {
-                              setDraggedCharacter(null);
-                              setIsDragging(false);
-                            }}
-                            className="flex items-center gap-3 p-2 rounded-lg border-2 border-border bg-card/95 backdrop-blur-sm cursor-move hover:bg-card hover:shadow-md transition-all active:opacity-50"
-                          >
-                            <Avatar className="w-10 h-10 border-2 border-accent">
-                              {character.avatar_url ? (
-                                <AvatarImage src={character.avatar_url} alt={character.name} />
-                              ) : null}
-                              <AvatarFallback className="bg-primary text-primary-foreground font-bold">
-                                {character.name[0].toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">
-                                {character.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {character.race} • {character.class}
-                              </p>
-                            </div>
+                  <PopoverContent className="w-72 p-2" align="start">
+                    <Tabs defaultValue="heroes">
+                      <TabsList className="w-full mb-2">
+                        <TabsTrigger value="heroes" className="flex-1">Герои</TabsTrigger>
+                        <TabsTrigger value="npcs" className="flex-1">НПС / Существа</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="heroes" className="mt-0">
+                        {availableCharacters.length === 0 ? (
+                          <div className="text-sm text-muted-foreground text-center py-4">
+                            Все герои уже на карте
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        ) : (
+                          <div className="space-y-1 max-h-80 overflow-y-auto">
+                            {availableCharacters.map((character) => (
+                              <div
+                                key={character.id}
+                                draggable
+                                onDragStart={(e) => {
+                                  handleCharacterDragStart(character);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  e.dataTransfer.setData('text/plain', character.id);
+                                  e.dataTransfer.setData('entity-type', 'hero');
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedCharacter(null);
+                                  setIsDragging(false);
+                                }}
+                                className="flex items-center gap-2 p-2 rounded-lg border border-border bg-card/95 cursor-move hover:bg-muted transition-all active:opacity-50"
+                              >
+                                <Avatar className="w-8 h-8 border border-accent shrink-0">
+                                  {character.avatar_url ? (
+                                    <AvatarImage src={character.avatar_url} alt={character.name} />
+                                  ) : null}
+                                  <AvatarFallback className="bg-primary text-primary-foreground font-bold text-xs">
+                                    {character.name[0].toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{character.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {character.race} · {character.class}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </TabsContent>
+
+                      <TabsContent value="npcs" className="mt-0 space-y-2">
+                        <Input
+                          placeholder="Поиск существа..."
+                          value={npcSearch}
+                          onChange={(e) => setNpcSearch(e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                        {monsters.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-3">Загрузка...</p>
+                        ) : (
+                          <div className="space-y-1 max-h-72 overflow-y-auto">
+                            {monsters
+                              .filter(m => m.name.toLowerCase().includes(npcSearch.toLowerCase()))
+                              .map((monster) => (
+                                <div
+                                  key={monster.slug}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    handleNPCDragStart({ slug: monster.slug, name: monster.name });
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    e.dataTransfer.setData('entity-type', 'npc');
+                                    e.dataTransfer.setData('npc-slug', monster.slug);
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggedNPC(null);
+                                    setIsDragging(false);
+                                  }}
+                                  className="flex items-center gap-2 p-2 rounded-lg border border-border bg-card/95 cursor-move hover:bg-muted transition-all active:opacity-50"
+                                >
+                                  <div className="w-8 h-8 rounded-full bg-destructive/20 border border-destructive/40 flex items-center justify-center shrink-0">
+                                    <span className="text-xs font-bold text-destructive">
+                                      {monster.name[0].toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{monster.name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      КО {monster.cr ?? '?'} · HP {monster.hp_average ?? '?'} · КБ {monster.armor_class}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
                   </PopoverContent>
                 </Popover>
               )}

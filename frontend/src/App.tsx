@@ -14,6 +14,8 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import MyCharacters from './pages/MyCharacters';
 import CreateCharacter from './pages/CreateCharacter';
+import MyScenarios from './pages/MyScenarios';
+import ScenarioBuilder from './pages/ScenarioBuilder';
 
 // Компонент для обработки глобальных событий авторизации
 function AuthEventHandler() {
@@ -139,6 +141,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <CreateCharacter />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/scenarios"
+            element={
+              <ProtectedRoute>
+                <MyScenarios />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/scenarios/builder"
+            element={
+              <ProtectedRoute>
+                <ScenarioBuilder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/scenarios/builder/:scenarioId"
+            element={
+              <ProtectedRoute>
+                <ScenarioBuilder />
               </ProtectedRoute>
             }
           />
