@@ -59,7 +59,8 @@ def register_participant_handlers(sio):
                 game_rooms[game_id].add(sid)
                 await sio.enter_room(sid, f"game:{game_id}")
 
-                game_state = get_game_state(db, game_id)
+                _is_master = participant.role == "master"
+                game_state = get_game_state(db, game_id, include_hidden=_is_master)
                 await sio.emit("game:state", game_state, room=sid)
 
                 user = get_user_from_db(user_id)

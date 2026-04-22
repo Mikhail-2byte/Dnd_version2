@@ -14,6 +14,7 @@ from .item import Weapon, Armor
 from .inventory import CharacterInventory
 from .character_spell import CharacterSpell, SpellSlotTracker
 from .monster import Monster, MonsterAction
+from .scenario import Scenario, ScenarioNPC, ScenarioHiddenItem
 
 __all__ = [
     "User", "GameSession", "GameParticipant", "Token", "Character",
@@ -21,5 +22,6 @@ __all__ = [
     "Race", "SubRace", "Background", "ClassFeature", "Spell", "Weapon", "Armor",
     "CharacterInventory", "CharacterSpell", "SpellSlotTracker",
     "Monster", "MonsterAction",
+    "Scenario", "ScenarioNPC", "ScenarioHiddenItem",
 ]
 

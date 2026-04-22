@@ -85,3 +85,10 @@ async def emit_turn_changed(game_id: UUID, combat_data: dict):
     """Emit turn change event to all players in the game."""
     if state._sio_instance:
         await state._sio_instance.emit("combat:turn_changed", combat_data, room=f"game:{game_id}")
+
+
+async def emit_token_revealed(game_id: UUID, token_data: dict):
+    """Мастер раскрыл скрытый токен — уведомить всех игроков в комнате"""
+    if state._sio_instance:
+        await state._sio_instance.emit("token:revealed", token_data, room=f"game:{game_id}")
+        logger.info(f"Emitted token:revealed for game {game_id}, token {token_data.get('token_id')}")

@@ -27,10 +27,10 @@ def get_user_from_db(user_id: UUID) -> User | None:
         db.close()
 
 
-def get_game_state(db: Session, game_id: UUID) -> dict:
-    """Получение полного состояния игры"""
+def get_game_state(db: Session, game_id: UUID, include_hidden: bool = False) -> dict:
+    """Получение полного состояния игры. include_hidden=True только для мастера."""
     game = get_game_by_id(db, game_id)
-    tokens = get_game_tokens(db, game_id)
+    tokens = get_game_tokens(db, game_id, include_hidden=include_hidden)
     participants = db.query(GameParticipant).filter(
         GameParticipant.game_id == game_id
     ).all()
@@ -60,7 +60,10 @@ def get_game_state(db: Session, game_id: UUID) -> dict:
                 "name": token.name,
                 "x": token.x,
                 "y": token.y,
-                "image_url": token.image_url
+                "image_url": token.image_url,
+                "is_hidden": token.is_hidden,
+                "token_type": token.token_type,
+                "token_metadata": token.token_metadata,
             }
             for token in tokens
         ],

@@ -6,7 +6,7 @@ import os
 import logging
 from .config import settings
 from .database import engine, Base, check_db_connection
-from .api import auth, games, maps, dice, characters, combat, game_data
+from .api import auth, games, maps, dice, characters, combat, game_data, scenarios
 from .sockets.game_events import register_socket_handlers
 
 logger = logging.getLogger(__name__)
@@ -67,6 +67,7 @@ app.include_router(dice.router)
 app.include_router(characters.router)
 app.include_router(combat.router)
 app.include_router(game_data.router)
+app.include_router(scenarios.router)
 
 
 @app.get("/")

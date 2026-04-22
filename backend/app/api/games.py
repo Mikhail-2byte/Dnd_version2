@@ -5,7 +5,7 @@ from sqlalchemy import desc
 from uuid import UUID
 from typing import List, Optional
 from ..database import get_db
-from ..schemas.game import GameCreate, GameResponse, ParticipantReadyUpdate, ParticipantCharacterUpdate, ParticipantResponse, MasterTransferRequest, MasterTransferResponse
+from ..schemas.game import GameCreate, GameResponse, ParticipantReadyUpdate, ParticipantCharacterUpdate, ParticipantResponse, MasterTransferRequest, MasterTransferResponse, GiveItemRequest
 from ..schemas.token import TokenCreate, TokenResponse as TokenResponseSchema, TokenUpdate
 from ..services.game_service import (
     create_game,
@@ -17,6 +17,8 @@ from ..services.game_service import (
     update_token_position,
     delete_token,
     get_game_tokens,
+    reveal_token,
+    give_item_to_character,
     set_participant_ready,
     set_participant_character,
     get_game_participants,
@@ -119,8 +121,9 @@ async def get_tokens(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получение всех токенов игры"""
-    tokens = get_game_tokens(db, game_id)
+    """Получение токенов игры. Скрытые токены видны только мастеру."""
+    include_hidden = is_master(db, game_id, current_user.id)
+    tokens = get_game_tokens(db, game_id, include_hidden=include_hidden)
     return [TokenResponseSchema.model_validate(token) for token in tokens]
 
 
@@ -173,6 +176,44 @@ async def delete_token_endpoint(
             detail="Only master can delete tokens"
         )
     delete_token(db, token_id)
+
+
+@router.post("/{game_id}/tokens/{token_id}/reveal", response_model=TokenResponseSchema)
+async def reveal_token_endpoint(
+    game_id: UUID,
+    token_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Мастер раскрывает скрытый токен — токен становится виден всем игрокам"""
+    if not is_master(db, game_id, current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only master can reveal tokens")
+    token = reveal_token(db, token_id, game_id)
+    from ..sockets.emitters import emit_token_revealed
+    await emit_token_revealed(game_id, {
+        "token_id": str(token.id),
+        "name": token.name,
+        "x": token.x,
+        "y": token.y,
+        "image_url": token.image_url,
+        "token_type": token.token_type,
+        "token_metadata": token.token_metadata,
+    })
+    return TokenResponseSchema.model_validate(token)
+
+
+@router.post("/{game_id}/give-item", status_code=status.HTTP_201_CREATED)
+async def give_item_endpoint(
+    game_id: UUID,
+    data: GiveItemRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Мастер выдаёт предмет персонажу игрока"""
+    if not is_master(db, game_id, current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only master can give items")
+    inv_item = give_item_to_character(db, game_id, data.character_id, data.item_type, data.item_id, data.quantity)
+    return {"message": "Item given", "inventory_id": str(inv_item.id)}
 
 
 @router.patch("/{game_id}/participants/me/ready", response_model=ParticipantResponse)

@@ -6,6 +6,7 @@ from uuid import UUID
 from ..models.game_session import GameSession
 from ..models.game_participant import GameParticipant
 from ..models.token import Token
+from ..models.inventory import CharacterInventory
 from ..schemas.game import GameCreate
 from ..schemas.token import TokenCreate, TokenUpdate
 
@@ -119,7 +120,10 @@ def create_token(db: Session, game_id: UUID, token_data: TokenCreate) -> Token:
         name=token_data.name,
         x=token_data.x,
         y=token_data.y,
-        image_url=token_data.image_url
+        image_url=token_data.image_url,
+        is_hidden=token_data.is_hidden,
+        token_type=token_data.token_type,
+        token_metadata=token_data.token_metadata,
     )
     db.add(token)
     db.commit()
@@ -155,9 +159,44 @@ def delete_token(db: Session, token_id: UUID) -> None:
     db.commit()
 
 
-def get_game_tokens(db: Session, game_id: UUID) -> list[Token]:
-    """Получение всех токенов игры"""
-    return db.query(Token).filter(Token.game_id == game_id).all()
+def get_game_tokens(db: Session, game_id: UUID, include_hidden: bool = True) -> list[Token]:
+    """Получение токенов игры. Если include_hidden=False — скрытые не возвращаются."""
+    q = db.query(Token).filter(Token.game_id == game_id)
+    if not include_hidden:
+        q = q.filter(Token.is_hidden == False)
+    return q.all()
+
+
+def reveal_token(db: Session, token_id: UUID, game_id: UUID) -> Token:
+    """Раскрыть скрытый токен — сделать его видимым для всех игроков"""
+    token = db.query(Token).filter(Token.id == token_id, Token.game_id == game_id).first()
+    if not token:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+    token.is_hidden = False
+    db.commit()
+    db.refresh(token)
+    return token
+
+
+def give_item_to_character(db: Session, game_id: UUID, character_id: UUID,
+                            item_type: str, item_id: UUID, quantity: int = 1) -> CharacterInventory:
+    """Мастер выдаёт предмет персонажу одного из игроков"""
+    participant = db.query(GameParticipant).filter(
+        GameParticipant.game_id == game_id,
+        GameParticipant.character_id == character_id
+    ).first()
+    if not participant:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Character not in this game")
+    inv_item = CharacterInventory(
+        character_id=character_id,
+        item_type=item_type,
+        item_id=item_id,
+        quantity=quantity,
+    )
+    db.add(inv_item)
+    db.commit()
+    db.refresh(inv_item)
+    return inv_item
 
 
 def set_participant_ready(db: Session, game_id: UUID, user_id: UUID, is_ready: bool) -> GameParticipant:

@@ -54,3 +54,10 @@ class MasterTransferResponse(BaseModel):
     game: GameResponse
     new_master_id: UUID
     old_master_id: UUID
+
+
+class GiveItemRequest(BaseModel):
+    character_id: UUID
+    item_type: str
+    item_id: UUID
+    quantity: int = 1

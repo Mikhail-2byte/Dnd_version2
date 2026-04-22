@@ -18,6 +18,7 @@ from .handlers.connection import register_connection_handlers
 from .handlers.token_handlers import register_token_handlers
 from .handlers.dice_handlers import register_dice_handlers
 from .handlers.participant_handlers import register_participant_handlers
+from .handlers.chat import register_chat_handlers
 
 
 def register_socket_handlers(sio: AsyncServer):
@@ -28,6 +29,7 @@ def register_socket_handlers(sio: AsyncServer):
     register_token_handlers(sio)
     register_dice_handlers(sio)
     register_participant_handlers(sio)
+    register_chat_handlers(sio)
 
 
 __all__ = [

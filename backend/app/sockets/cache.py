@@ -18,7 +18,9 @@ def save_game_state_to_redis(game_id: UUID, tokens: list[Token]) -> None:
             "name": token.name,
             "x": token.x,
             "y": token.y,
-            "image_url": token.image_url or ""
+            "image_url": token.image_url or "",
+            "is_hidden": token.is_hidden,
+            "token_type": token.token_type,
         }
         redis_client.hset(tokens_key, str(token.id), json.dumps(token_data))
 

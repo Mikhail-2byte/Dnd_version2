@@ -21,7 +21,7 @@ if config.config_file_name is not None:
 
 # Добавляем объект MetaData для 'autogenerate'
 from app.database import Base
-from app.models import User, GameSession, GameParticipant, Token
+from app.models import User, GameSession, GameParticipant, Token, Scenario, ScenarioNPC, ScenarioHiddenItem
 
 target_metadata = Base.metadata
 

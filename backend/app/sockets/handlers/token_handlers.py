@@ -88,6 +88,8 @@ def register_token_handlers(sio):
                 x = float(data.get("x"))
                 y = float(data.get("y"))
                 image_url = data.get("image_url")
+                is_hidden = bool(data.get("is_hidden", False))
+                token_type = data.get("token_type", "npc")
             except (ValueError, TypeError) as e:
                 logger.warning(f"Invalid token_create data: {e}")
                 await sio.emit("error", {"message": "Invalid token_create data"}, room=sid)
@@ -111,22 +113,30 @@ def register_token_handlers(sio):
                     return
 
                 from ...schemas.token import TokenCreate
-                token_data = TokenCreate(name=name, x=x, y=y, image_url=image_url)
+                token_data = TokenCreate(name=name, x=x, y=y, image_url=image_url,
+                                         is_hidden=is_hidden, token_type=token_type)
                 token = create_token(db, game_id, token_data)
                 logger.info(f"Token {token.id} ({name}) created by user {user_id} in game {game_id}")
 
                 tokens = get_game_tokens(db, game_id)
                 save_game_state_to_redis(game_id, tokens)
 
-                await sio.emit("token:created", {
+                token_payload = {
                     "token": {
                         "id": str(token.id),
                         "name": token.name,
                         "x": token.x,
                         "y": token.y,
-                        "image_url": token.image_url
+                        "image_url": token.image_url,
+                        "is_hidden": token.is_hidden,
+                        "token_type": token.token_type,
                     }
-                }, room=f"game:{game_id}")
+                }
+                if is_hidden:
+                    # Скрытый токен — только мастеру
+                    await sio.emit("token:created", token_payload, room=sid)
+                else:
+                    await sio.emit("token:created", token_payload, room=f"game:{game_id}")
 
             finally:
                 db.close()
